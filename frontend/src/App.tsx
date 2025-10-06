@@ -1057,13 +1057,20 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     }
 
     const member = members.find(m => m.id === Number(selectedMember))
-    const newShifts: any[] = []
+    let updatedShifts = [...shifts]
+    let addedCount = 0
+    let updatedCount = 0
 
     selectedDates.forEach((date, dateIndex) => {
       if (isOtherSelected) {
         // その他の活動
-        newShifts.push({
-          id: Date.now() + dateIndex * 100,
+        const existingShift = updatedShifts.find(s =>
+          s.member_id === member.id &&
+          s.date === date &&
+          s.is_other === true
+        )
+
+        const shiftData = {
           member_id: member.id,
           member_name: member.name,
           location_id: 0,
@@ -1073,13 +1080,33 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           date,
           start_time: null,
           end_time: null,
-          status: '提出済み',
-          created_at: new Date().toISOString()
-        })
+          status: '提出済み'
+        }
+
+        if (existingShift) {
+          // 既存のシフトを更新
+          updatedShifts = updatedShifts.map(s =>
+            s.id === existingShift.id ? { ...s, ...shiftData, updated_at: new Date().toISOString() } : s
+          )
+          updatedCount++
+        } else {
+          // 新規追加
+          updatedShifts.push({
+            id: Date.now() + dateIndex * 100,
+            ...shiftData,
+            created_at: new Date().toISOString()
+          })
+          addedCount++
+        }
       } else if (memberType === 'advisor') {
         // アドバイザー（常駐先なし）
-        newShifts.push({
-          id: Date.now() + dateIndex * 100,
+        const existingShift = updatedShifts.find(s =>
+          s.member_id === member.id &&
+          s.date === date &&
+          s.location_id === -2
+        )
+
+        const shiftData = {
           member_id: member.id,
           member_name: member.name,
           location_id: -2,
@@ -1089,15 +1116,35 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           date,
           start_time: null,
           end_time: null,
-          status: '提出済み',
-          created_at: new Date().toISOString()
-        })
+          status: '提出済み'
+        }
+
+        if (existingShift) {
+          // 既存のシフトを更新
+          updatedShifts = updatedShifts.map(s =>
+            s.id === existingShift.id ? { ...s, ...shiftData, updated_at: new Date().toISOString() } : s
+          )
+          updatedCount++
+        } else {
+          // 新規追加
+          updatedShifts.push({
+            id: Date.now() + dateIndex * 100,
+            ...shiftData,
+            created_at: new Date().toISOString()
+          })
+          addedCount++
+        }
       } else {
         // 常駐人材（複数のクライアント先）
         selectedLocations.forEach((locationId, locIndex) => {
           const location = locations.find(l => l.id === Number(locationId))
-          newShifts.push({
-            id: Date.now() + dateIndex * 100 + locIndex * 10,
+          const existingShift = updatedShifts.find(s =>
+            s.member_id === member.id &&
+            s.date === date &&
+            s.location_id === location.id
+          )
+
+          const shiftData = {
             member_id: member.id,
             member_name: member.name,
             location_id: location.id,
@@ -1107,15 +1154,35 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             date,
             start_time: null,
             end_time: null,
-            status: '提出済み',
-            created_at: new Date().toISOString()
-          })
+            status: '提出済み'
+          }
+
+          if (existingShift) {
+            // 既存のシフトを更新
+            updatedShifts = updatedShifts.map(s =>
+              s.id === existingShift.id ? { ...s, ...shiftData, updated_at: new Date().toISOString() } : s
+            )
+            updatedCount++
+          } else {
+            // 新規追加
+            updatedShifts.push({
+              id: Date.now() + dateIndex * 100 + locIndex * 10,
+              ...shiftData,
+              created_at: new Date().toISOString()
+            })
+            addedCount++
+          }
         })
 
         // オフィスのシフトも追加
         if (includeOffice) {
-          newShifts.push({
-            id: Date.now() + dateIndex * 100 + 99,
+          const existingOfficeShift = updatedShifts.find(s =>
+            s.member_id === member.id &&
+            s.date === date &&
+            s.location_id === -1
+          )
+
+          const officeShiftData = {
             member_id: member.id,
             member_name: member.name,
             location_id: -1,
@@ -1125,15 +1192,29 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             date,
             start_time: null,
             end_time: null,
-            status: '提出済み',
-            created_at: new Date().toISOString()
-          })
+            status: '提出済み'
+          }
+
+          if (existingOfficeShift) {
+            // 既存のシフトを更新
+            updatedShifts = updatedShifts.map(s =>
+              s.id === existingOfficeShift.id ? { ...s, ...officeShiftData, updated_at: new Date().toISOString() } : s
+            )
+            updatedCount++
+          } else {
+            // 新規追加
+            updatedShifts.push({
+              id: Date.now() + dateIndex * 100 + 99,
+              ...officeShiftData,
+              created_at: new Date().toISOString()
+            })
+            addedCount++
+          }
         }
       }
     })
 
-    const updated = [...shifts, ...newShifts]
-    saveShifts(updated)
+    saveShifts(updatedShifts)
 
     setSelectedMember('')
     setSelectedLocation('')
@@ -1143,7 +1224,14 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     setIncludeOffice(false)
     setMemberType('resident')
     setSelectedDates([])
-    alert(`${newShifts.length}件のシフトを登録しました`)
+
+    if (updatedCount > 0 && addedCount > 0) {
+      alert(`シフト登録完了: 新規${addedCount}件、更新${updatedCount}件`)
+    } else if (updatedCount > 0) {
+      alert(`${updatedCount}件のシフトを更新しました`)
+    } else {
+      alert(`${addedCount}件のシフトを登録しました`)
+    }
   }
 
   const openEditTime = (shift: any) => {
