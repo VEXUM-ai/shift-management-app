@@ -133,6 +133,7 @@ function MemberManagement() {
   const [salaryType, setSalaryType] = useState<'hourly' | 'fixed'>('hourly')
   const [hourlyWage, setHourlyWage] = useState('')
   const [fixedSalary, setFixedSalary] = useState('')
+  const [editingMember, setEditingMember] = useState<any>(null)
 
   useEffect(() => {
     loadMembers()
@@ -166,32 +167,142 @@ function MemberManagement() {
       return
     }
 
-    const newMember = {
-      id: Date.now(),
-      name,
-      email,
-      office_transport_fee: parseFloat(officeTransportFee || '0'),
-      salary_type: salaryType,
-      hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
-      fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
-      created_at: new Date().toISOString()
-    }
+    if (editingMember) {
+      // 編集モード
+      const updated = members.map(m =>
+        m.id === editingMember.id
+          ? {
+              ...m,
+              name,
+              email,
+              office_transport_fee: parseFloat(officeTransportFee || '0'),
+              salary_type: salaryType,
+              hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
+              fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
+            }
+          : m
+      )
+      saveMembers(updated)
+      setEditingMember(null)
+      alert('メンバー情報を更新しました')
+    } else {
+      // 新規追加モード
+      const newMember = {
+        id: Date.now(),
+        name,
+        email,
+        office_transport_fee: parseFloat(officeTransportFee || '0'),
+        salary_type: salaryType,
+        hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
+        fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
+        created_at: new Date().toISOString()
+      }
 
-    const updated = [...members, newMember]
-    saveMembers(updated)
+      const updated = [...members, newMember]
+      saveMembers(updated)
+      alert('メンバーを追加しました')
+    }
 
     setName('')
     setEmail('')
     setOfficeTransportFee('')
     setHourlyWage('')
     setFixedSalary('')
-    alert('メンバーを追加しました')
+    setSalaryType('hourly')
+  }
+
+  const editMember = (member: any) => {
+    setEditingMember(member)
+    setName(member.name)
+    setEmail(member.email || '')
+    setOfficeTransportFee(String(member.office_transport_fee || ''))
+    setSalaryType(member.salary_type)
+    setHourlyWage(member.salary_type === 'hourly' ? String(member.hourly_wage || '') : '')
+    setFixedSalary(member.salary_type === 'fixed' ? String(member.fixed_salary || '') : '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEdit = () => {
+    setEditingMember(null)
+    setName('')
+    setEmail('')
+    setOfficeTransportFee('')
+    setHourlyWage('')
+    setFixedSalary('')
+    setSalaryType('hourly')
   }
 
   const deleteMember = (id: number) => {
     if (!confirm('このメンバーを削除しますか？')) return
     const updated = members.filter(m => m.id !== id)
     saveMembers(updated)
+  }
+
+  const importCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const lines = text.split('\n').filter(line => line.trim())
+
+      // ヘッダー行をスキップ
+      const dataLines = lines.slice(1)
+
+      const importedMembers = dataLines.map((line, index) => {
+        const parts = line.split('\t').map(part => part.trim())
+
+        const name = parts[0] || ''
+        const email = parts[1] || ''
+        const salaryInfo = parts[2] || ''
+
+        // 給与形態を判定
+        let salaryType: 'hourly' | 'fixed' = 'hourly'
+        let hourlyWage = 0
+        let fixedSalary = 0
+
+        if (salaryInfo.includes('固定')) {
+          salaryType = 'fixed'
+          const match = salaryInfo.match(/(\d+)万円/)
+          if (match) {
+            fixedSalary = parseInt(match[1]) * 10000
+          }
+        } else if (salaryInfo.includes('時給')) {
+          salaryType = 'hourly'
+          const match = salaryInfo.match(/(\d+)円/)
+          if (match) {
+            hourlyWage = parseInt(match[1])
+          }
+        }
+
+        return {
+          id: Date.now() + index,
+          name,
+          email,
+          office_transport_fee: 0,
+          salary_type: salaryType,
+          hourly_wage: hourlyWage,
+          fixed_salary: fixedSalary,
+          created_at: new Date().toISOString()
+        }
+      }).filter(m => m.name) // 名前が空の行は除外
+
+      if (importedMembers.length === 0) {
+        alert('インポートできるデータがありませんでした')
+        return
+      }
+
+      // 既存のメンバーに追加
+      const updated = [...members, ...importedMembers]
+      saveMembers(updated)
+      alert(`${importedMembers.length}名のメンバーをインポートしました`)
+
+      // ファイル入力をリセット
+      e.target.value = ''
+    }
+
+    reader.readAsText(file, 'UTF-8')
   }
 
   return (
@@ -209,7 +320,13 @@ function MemberManagement() {
       </div>
 
       <div className="member-form">
-        <h3>👤 新しいメンバーを追加</h3>
+        <h3>{editingMember ? '✏️ メンバー情報を編集' : '👤 新しいメンバーを追加'}</h3>
+
+        {editingMember && (
+          <div className="info-text">
+            編集中: <strong>{editingMember.name}</strong>
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-group">
@@ -279,12 +396,36 @@ function MemberManagement() {
 
         <div className="form-actions">
           <button onClick={addMember} className="submit-btn">
-            ➕ メンバー追加
+            {editingMember ? '💾 更新' : '➕ メンバー追加'}
           </button>
+          {editingMember && (
+            <button onClick={cancelEdit} className="cancel-btn">
+              キャンセル
+            </button>
+          )}
         </div>
       </div>
 
       <h3>📋 登録済みメンバー一覧</h3>
+
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+        <div>
+          <label htmlFor="csv-import" className="submit-btn" style={{ cursor: 'pointer', display: 'inline-block' }}>
+            📥 CSVインポート
+          </label>
+          <input
+            id="csv-import"
+            type="file"
+            accept=".csv,.txt,.tsv"
+            onChange={importCSV}
+            style={{ display: 'none' }}
+          />
+        </div>
+        <div style={{ color: '#666', fontSize: '14px' }}>
+          形式: 名前 [TAB] メール [TAB] 給与情報（固定50万円 または 時給1500円）
+        </div>
+      </div>
+
       <div className="members-table-wrapper">
         <table>
           <thead>
@@ -315,6 +456,7 @@ function MemberManagement() {
                 </td>
                 <td>¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日</td>
                 <td>
+                  <button className="edit-btn" onClick={() => editMember(member)}>✏️ 編集</button>
                   <button className="delete-btn" onClick={() => deleteMember(member.id)}>削除</button>
                 </td>
               </tr>
@@ -1059,20 +1201,76 @@ function ShiftManagement() {
     const dateShifts = groupedByDate[date]
     if (dateShifts.length === 0) return
 
-    // この日付のシフトからメンバーと場所を取得（最初のシフトを参照）
-    const firstShift = dateShifts[0]
-    setSelectedMember(String(firstShift.member_id))
+    // この日付の全メンバーのシフトを取得（オフィス除く）
+    const uniqueMembers = Array.from(new Set(
+      dateShifts
+        .filter((s: any) => s.location_id !== -1)
+        .map((s: any) => s.member_id)
+    ))
 
-    if (firstShift.is_other) {
+    if (uniqueMembers.length === 0) {
+      alert('この日にメンバーのシフトがありません')
+      return
+    }
+
+    // 複数メンバーがいる場合は選択させる
+    if (uniqueMembers.length > 1) {
+      const memberNames = uniqueMembers
+        .map(id => {
+          const m = members.find(m => m.id === id)
+          return m ? `${id}: ${m.name}` : String(id)
+        })
+        .join('\n')
+
+      const selectedId = prompt(`複数のメンバーがいます。再登録するメンバーのIDを入力してください:\n\n${memberNames}`)
+
+      if (!selectedId) return
+
+      const memberId = Number(selectedId)
+      if (!uniqueMembers.includes(memberId)) {
+        alert('無効なメンバーIDです')
+        return
+      }
+
+      // 選択されたメンバーのシフトのみ取得
+      const memberShifts = dateShifts.filter((s: any) => s.member_id === memberId && s.location_id !== -1)
+
+      if (memberShifts.length === 0) return
+
+      const firstShift = memberShifts[0]
+      populateFormFromShift(firstShift, date, memberShifts)
+    } else {
+      // 1人だけの場合は自動で設定
+      const memberId = uniqueMembers[0]
+      const memberShifts = dateShifts.filter((s: any) => s.member_id === memberId && s.location_id !== -1)
+
+      if (memberShifts.length === 0) return
+
+      const firstShift = memberShifts[0]
+      populateFormFromShift(firstShift, date, memberShifts)
+    }
+  }
+
+  const populateFormFromShift = (shift: any, date: string, memberShifts: any[]) => {
+    setSelectedMember(String(shift.member_id))
+
+    // オフィスシフトの有無をチェック
+    const hasOffice = shifts.some(
+      s => s.date === date &&
+           s.member_id === shift.member_id &&
+           s.location_id === -1
+    )
+
+    if (shift.is_other) {
       setIsOtherSelected(true)
-      setOtherActivity(firstShift.location_name.replace('その他: ', ''))
+      setOtherActivity(shift.location_name.replace('その他: ', ''))
       setSelectedLocation('')
       setIncludeOffice(false)
     } else {
       setIsOtherSelected(false)
-      setSelectedLocation(String(firstShift.location_id))
+      setSelectedLocation(String(shift.location_id))
       setOtherActivity('')
-      setIncludeOffice(false)
+      setIncludeOffice(hasOffice)
     }
 
     setSelectedDates([date])
@@ -1080,7 +1278,7 @@ function ShiftManagement() {
 
     // スクロールして入力フォームを表示
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    alert('シフト情報を入力欄に反映しました。勤務地を編集して再登録してください（時間は勤怠管理から反映されます）。')
+    alert('シフト情報を入力欄に反映しました。メンバーを変更して一括再登録できます（時間は勤怠管理から反映されます）。')
   }
 
   const exportCSV = () => {
@@ -1511,53 +1709,58 @@ function ShiftManagement() {
                         </tr>
                       </thead>
                       <tbody>
-                        {groupedByDate[date].map((shift: any) => {
-                          // 同じ日付・メンバーでオフィスシフトがあるかチェック
-                          const hasOffice = shifts.some(
-                            s => s.date === shift.date &&
-                                 s.member_id === shift.member_id &&
-                                 s.location_id === -1
-                          )
+                        {groupedByDate[date]
+                          .filter((shift: any) => shift.location_id !== -1) // オフィス単独のシフトは表示しない
+                          .map((shift: any) => {
+                            // 同じ日付・メンバーでオフィスシフトがあるかチェック
+                            const hasOffice = shifts.some(
+                              s => s.date === shift.date &&
+                                   s.member_id === shift.member_id &&
+                                   s.location_id === -1
+                            )
 
-                          return (
-                            <tr key={shift.id} className={selectedShiftsForDelete.includes(shift.id) ? 'selected-for-delete' : ''}>
-                              <td>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedShiftsForDelete.includes(shift.id)}
-                                  onChange={() => toggleShiftSelection(shift.id)}
-                                />
-                              </td>
-                              <td><strong>{shift.member_name}</strong></td>
-                              <td>
-                                <span className={`location-badge ${
-                                  shift.is_other
-                                    ? 'location-other'
-                                    : shift.location_id === -1
-                                    ? 'location-office'
-                                    : `location-${shift.location_id % 10}`
-                                }`}>
-                                  {shift.location_name}
-                                </span>
-                              </td>
-                              <td>
-                                {shift.location_id === -1 ? (
-                                  <span style={{ color: '#999' }}>-</span>
-                                ) : shift.is_other ? (
-                                  <span style={{ color: '#999' }}>-</span>
-                                ) : hasOffice ? (
-                                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>✓ あり</span>
-                                ) : (
-                                  <span style={{ color: '#999' }}>なし</span>
-                                )}
-                              </td>
-                              <td>
-                                <button className="edit-btn" onClick={() => openEditShiftInfo(shift)}>✏️ 編集</button>
-                                <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
-                              </td>
-                            </tr>
-                          )
-                        })}
+                            return (
+                              <tr key={shift.id} className={selectedShiftsForDelete.includes(shift.id) ? 'selected-for-delete' : ''}>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedShiftsForDelete.includes(shift.id)}
+                                    onChange={() => toggleShiftSelection(shift.id)}
+                                  />
+                                </td>
+                                <td><strong>{shift.member_name}</strong></td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span className={`location-badge ${
+                                      shift.is_other
+                                        ? 'location-other'
+                                        : `location-${shift.location_id % 10}`
+                                    }`}>
+                                      {shift.location_name}
+                                    </span>
+                                    {hasOffice && !shift.is_other && (
+                                      <span className="location-badge location-office" style={{ fontSize: '11px' }}>
+                                        🏢 オフィス
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  {shift.is_other ? (
+                                    <span style={{ color: '#999' }}>-</span>
+                                  ) : hasOffice ? (
+                                    <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '18px' }}>🏢</span>
+                                  ) : (
+                                    <span style={{ color: '#ccc', fontSize: '18px' }}>-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <button className="edit-btn" onClick={() => openEditShiftInfo(shift)}>✏️ 編集</button>
+                                  <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
+                                </td>
+                              </tr>
+                            )
+                          })}
                       </tbody>
                     </table>
                   </div>
