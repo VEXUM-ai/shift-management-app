@@ -633,6 +633,15 @@ function ShiftManagement() {
   const [editEndTime, setEditEndTime] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState('')
+  const [filterMember, setFilterMember] = useState('')
+  const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
+  const [includeOffice, setIncludeOffice] = useState(false)
+  const [editingShiftInfo, setEditingShiftInfo] = useState<any>(null)
+  const [editMember, setEditMember] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editIncludeOffice, setEditIncludeOffice] = useState(false)
+  const [editIsOther, setEditIsOther] = useState(false)
+  const [editOtherActivity, setEditOtherActivity] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -808,19 +817,41 @@ function ShiftManagement() {
       }
     }
 
-    const newShifts = selectedDates.map((date, index) => ({
-      id: Date.now() + index,
-      member_id: member.id,
-      member_name: member.name,
-      location_id: locationData.id,
-      location_name: locationData.name,
-      is_other: isOtherSelected,
-      date,
-      start_time: null,
-      end_time: null,
-      status: '提出済み',
-      created_at: new Date().toISOString()
-    }))
+    const newShifts: any[] = []
+
+    selectedDates.forEach((date, index) => {
+      // クライアント先のシフト
+      newShifts.push({
+        id: Date.now() + index * 2,
+        member_id: member.id,
+        member_name: member.name,
+        location_id: locationData.id,
+        location_name: locationData.name,
+        is_other: isOtherSelected,
+        date,
+        start_time: null,
+        end_time: null,
+        status: '提出済み',
+        created_at: new Date().toISOString()
+      })
+
+      // オフィスのシフトも追加
+      if (includeOffice && !isOtherSelected) {
+        newShifts.push({
+          id: Date.now() + index * 2 + 1,
+          member_id: member.id,
+          member_name: member.name,
+          location_id: -1,
+          location_name: 'オフィス',
+          is_other: false,
+          date,
+          start_time: null,
+          end_time: null,
+          status: '提出済み',
+          created_at: new Date().toISOString()
+        })
+      }
+    })
 
     const updated = [...shifts, ...newShifts]
     saveShifts(updated)
@@ -829,8 +860,9 @@ function ShiftManagement() {
     setSelectedLocation('')
     setOtherActivity('')
     setIsOtherSelected(false)
+    setIncludeOffice(false)
     setSelectedDates([])
-    alert(`${selectedDates.length}件のシフトを登録しました`)
+    alert(`${newShifts.length}件のシフトを登録しました`)
   }
 
   const openEditTime = (shift: any) => {
@@ -864,6 +896,191 @@ function ShiftManagement() {
     if (!confirm('このシフトを削除しますか？')) return
     const updated = shifts.filter(s => s.id !== id)
     saveShifts(updated)
+  }
+
+  const openEditShiftInfo = (shift: any) => {
+    setEditingShiftInfo(shift)
+    setEditMember(String(shift.member_id))
+
+    if (shift.is_other) {
+      setEditIsOther(true)
+      setEditOtherActivity(shift.location_name.replace('その他: ', ''))
+      setEditLocation('')
+    } else if (shift.location_id === -1) {
+      // オフィスのみの場合は編集不可（クライアント先のシフトから編集）
+      alert('オフィスのシフトは、対応するクライアント先のシフトから編集してください')
+      return
+    } else {
+      setEditIsOther(false)
+      setEditLocation(String(shift.location_id))
+      setEditOtherActivity('')
+
+      // 同じ日付・メンバーでオフィスのシフトがあるかチェック
+      const hasOffice = shifts.some(
+        s => s.date === shift.date &&
+             s.member_id === shift.member_id &&
+             s.location_id === -1
+      )
+      setEditIncludeOffice(hasOffice)
+    }
+  }
+
+  const saveShiftInfo = () => {
+    if (!editingShiftInfo) return
+
+    if (!editMember) {
+      alert('メンバーを選択してください')
+      return
+    }
+
+    if (!editIsOther && !editLocation) {
+      alert('勤務地を選択してください')
+      return
+    }
+
+    if (editIsOther && !editOtherActivity) {
+      alert('その他の活動内容を入力してください')
+      return
+    }
+
+    const member = members.find(m => m.id === Number(editMember))
+    let locationData = { id: 0, name: '' }
+
+    if (editIsOther) {
+      locationData = {
+        id: 0,
+        name: `その他: ${editOtherActivity}`
+      }
+    } else {
+      const location = locations.find(l => l.id === Number(editLocation))
+      locationData = {
+        id: location.id,
+        name: location.name
+      }
+    }
+
+    // 既存のシフトを更新
+    let updated = shifts.map(s =>
+      s.id === editingShiftInfo.id
+        ? {
+            ...s,
+            member_id: member.id,
+            member_name: member.name,
+            location_id: locationData.id,
+            location_name: locationData.name,
+            is_other: editIsOther
+          }
+        : s
+    )
+
+    // オフィスシフトの処理
+    const officeShift = shifts.find(
+      s => s.date === editingShiftInfo.date &&
+           s.member_id === editingShiftInfo.member_id &&
+           s.location_id === -1
+    )
+
+    if (editIncludeOffice && !editIsOther) {
+      // オフィスシフトを追加または更新
+      if (!officeShift) {
+        updated.push({
+          id: Date.now(),
+          member_id: member.id,
+          member_name: member.name,
+          location_id: -1,
+          location_name: 'オフィス',
+          is_other: false,
+          date: editingShiftInfo.date,
+          start_time: null,
+          end_time: null,
+          status: '提出済み',
+          created_at: new Date().toISOString()
+        })
+      } else {
+        updated = updated.map(s =>
+          s.id === officeShift.id
+            ? { ...s, member_id: member.id, member_name: member.name }
+            : s
+        )
+      }
+    } else if (!editIncludeOffice && officeShift) {
+      // オフィスシフトを削除
+      updated = updated.filter(s => s.id !== officeShift.id)
+    }
+
+    saveShifts(updated)
+    setEditingShiftInfo(null)
+    alert('シフト情報を更新しました')
+  }
+
+  const cancelEditShiftInfo = () => {
+    setEditingShiftInfo(null)
+    setEditMember('')
+    setEditLocation('')
+    setEditIncludeOffice(false)
+    setEditIsOther(false)
+    setEditOtherActivity('')
+  }
+
+  const toggleShiftSelection = (id: number) => {
+    if (selectedShiftsForDelete.includes(id)) {
+      setSelectedShiftsForDelete(selectedShiftsForDelete.filter(sid => sid !== id))
+    } else {
+      setSelectedShiftsForDelete([...selectedShiftsForDelete, id])
+    }
+  }
+
+  const selectAllShiftsInDate = (date: string) => {
+    const dateShiftIds = groupedByDate[date].map((s: any) => s.id)
+    const allSelected = dateShiftIds.every((id: number) => selectedShiftsForDelete.includes(id))
+
+    if (allSelected) {
+      setSelectedShiftsForDelete(selectedShiftsForDelete.filter(id => !dateShiftIds.includes(id)))
+    } else {
+      setSelectedShiftsForDelete([...new Set([...selectedShiftsForDelete, ...dateShiftIds])])
+    }
+  }
+
+  const bulkDeleteShifts = () => {
+    if (selectedShiftsForDelete.length === 0) {
+      alert('削除するシフトを選択してください')
+      return
+    }
+
+    if (!confirm(`選択した${selectedShiftsForDelete.length}件のシフトを削除しますか？`)) return
+
+    const updated = shifts.filter(s => !selectedShiftsForDelete.includes(s.id))
+    saveShifts(updated)
+    setSelectedShiftsForDelete([])
+    alert(`${selectedShiftsForDelete.length}件のシフトを削除しました`)
+  }
+
+  const reregisterFromDate = (date: string) => {
+    const dateShifts = groupedByDate[date]
+    if (dateShifts.length === 0) return
+
+    // この日付のシフトからメンバーと場所を取得（最初のシフトを参照）
+    const firstShift = dateShifts[0]
+    setSelectedMember(String(firstShift.member_id))
+
+    if (firstShift.is_other) {
+      setIsOtherSelected(true)
+      setOtherActivity(firstShift.location_name.replace('その他: ', ''))
+      setSelectedLocation('')
+      setIncludeOffice(false)
+    } else {
+      setIsOtherSelected(false)
+      setSelectedLocation(String(firstShift.location_id))
+      setOtherActivity('')
+      setIncludeOffice(false)
+    }
+
+    setSelectedDates([date])
+    setCalendarMonth(date.substring(0, 7))
+
+    // スクロールして入力フォームを表示
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    alert('シフト情報を入力欄に反映しました。勤務地を編集して再登録してください（時間は勤怠管理から反映されます）。')
   }
 
   const exportCSV = () => {
@@ -911,11 +1128,16 @@ function ShiftManagement() {
     return shift
   }
 
-  const filteredShifts = selectedMonth
+  let filteredShifts = selectedMonth
     ? shifts.filter(s => s.date.startsWith(selectedMonth))
         .map(getShiftWithAttendance)
         .sort((a, b) => a.date.localeCompare(b.date))
     : shifts.map(getShiftWithAttendance).sort((a, b) => a.date.localeCompare(b.date))
+
+  // メンバーフィルター適用
+  if (filterMember) {
+    filteredShifts = filteredShifts.filter(s => s.member_id === Number(filterMember))
+  }
 
   // 日付ごとにグループ化
   const groupedByDate = filteredShifts.reduce((acc: any, shift: any) => {
@@ -1018,20 +1240,35 @@ function ShiftManagement() {
         </div>
 
         {!isOtherSelected ? (
-          <div className="form-row">
-            <div className="form-group">
-              <label>クライアント先 <span className="required">*必須</span></label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              >
-                <option value="">選択してください</option>
-                {locations.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label>クライアント先 <span className="required">*必須</span></label>
+                <select
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                >
+                  <option value="">選択してください</option>
+                  {locations.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeOffice}
+                    onChange={(e) => setIncludeOffice(e.target.checked)}
+                    style={{ width: 'auto', marginRight: '8px', cursor: 'pointer' }}
+                  />
+                  オフィスにも出勤する
+                </label>
+              </div>
+            </div>
+          </>
         ) : (
           <div className="form-row">
             <div className="form-group">
@@ -1144,6 +1381,18 @@ function ShiftManagement() {
               onChange={(e) => setSelectedMonth(e.target.value)}
             />
           </div>
+          <div className="form-group">
+            <label>メンバーで絞り込み</label>
+            <select
+              value={filterMember}
+              onChange={(e) => setFilterMember(e.target.value)}
+            >
+              <option value="">全メンバー</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
           <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
         </div>
       </div>
@@ -1182,6 +1431,8 @@ function ShiftManagement() {
                     // クライアント先ごとに色を決定
                     const colorClass = shift.is_other
                       ? 'shift-other'
+                      : shift.location_id === -1
+                      ? 'shift-office'
                       : `shift-location-${shift.location_id % 10}`
 
                     return (
@@ -1213,97 +1464,199 @@ function ShiftManagement() {
 
       {/* テーブルビュー */}
       <div className="shift-table-view">
-        <h4>📋 リスト表示（日付順）</h4>
+        <div className="table-view-header">
+          <h4>📋 リスト表示（日付順）</h4>
+          {selectedShiftsForDelete.length > 0 && (
+            <button className="bulk-delete-btn" onClick={bulkDeleteShifts}>
+              🗑️ 選択した{selectedShiftsForDelete.length}件を一括削除
+            </button>
+          )}
+        </div>
+
         {Object.keys(groupedByDate).length === 0 ? (
           <p className="no-data">シフトが登録されていません</p>
         ) : (
           <div className="date-grouped-shifts">
-            {Object.keys(groupedByDate).sort().map((date) => (
-              <div key={date} className="date-group">
-                <div className="date-group-header">
-                  <h5>📅 {date} ({['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]}曜日)</h5>
-                  <span className="date-shift-count">{groupedByDate[date].length}件のシフト</span>
-                </div>
-                <div className="shifts-table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>メンバー</th>
-                        <th>勤務地</th>
-                        <th>開始時間</th>
-                        <th>終了時間</th>
-                        <th>ステータス</th>
-                        <th>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedByDate[date].map((shift: any) => (
-                        <tr key={shift.id}>
-                          <td><strong>{shift.member_name}</strong></td>
-                          <td>
-                            <span className={`location-badge ${shift.is_other ? 'location-other' : `location-${shift.location_id % 10}`}`}>
-                              {shift.location_name}
-                            </span>
-                          </td>
-                          <td>
-                            {shift.start_time || <span className="pending">未設定</span>}
-                            {shift.from_attendance && <span className="attendance-badge" title="勤怠データから反映">📊</span>}
-                          </td>
-                          <td>
-                            {shift.end_time || <span className="pending">未設定</span>}
-                            {shift.from_attendance && <span className="attendance-badge" title="勤怠データから反映">📊</span>}
-                          </td>
-                          <td><span className="status-badge">{shift.status}</span></td>
-                          <td>
-                            <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
-                            <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
-                          </td>
+            {Object.keys(groupedByDate).sort().map((date) => {
+              const dateShiftIds = groupedByDate[date].map((s: any) => s.id)
+              const allSelected = dateShiftIds.every((id: number) => selectedShiftsForDelete.includes(id))
+
+              return (
+                <div key={date} className="date-group">
+                  <div className="date-group-header">
+                    <div className="date-info">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() => selectAllShiftsInDate(date)}
+                        className="date-select-checkbox"
+                        title="この日のシフトを全選択"
+                      />
+                      <h5>📅 {date} ({['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]}曜日)</h5>
+                      <span className="date-shift-count">{groupedByDate[date].length}件のシフト</span>
+                    </div>
+                    <button className="reregister-btn" onClick={() => reregisterFromDate(date)}>
+                      🔄 この日のシフトを再登録
+                    </button>
+                  </div>
+                  <div className="shifts-table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th width="40">選択</th>
+                          <th>メンバー</th>
+                          <th>勤務地</th>
+                          <th>オフィス出勤</th>
+                          <th>操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {groupedByDate[date].map((shift: any) => {
+                          // 同じ日付・メンバーでオフィスシフトがあるかチェック
+                          const hasOffice = shifts.some(
+                            s => s.date === shift.date &&
+                                 s.member_id === shift.member_id &&
+                                 s.location_id === -1
+                          )
+
+                          return (
+                            <tr key={shift.id} className={selectedShiftsForDelete.includes(shift.id) ? 'selected-for-delete' : ''}>
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedShiftsForDelete.includes(shift.id)}
+                                  onChange={() => toggleShiftSelection(shift.id)}
+                                />
+                              </td>
+                              <td><strong>{shift.member_name}</strong></td>
+                              <td>
+                                <span className={`location-badge ${
+                                  shift.is_other
+                                    ? 'location-other'
+                                    : shift.location_id === -1
+                                    ? 'location-office'
+                                    : `location-${shift.location_id % 10}`
+                                }`}>
+                                  {shift.location_name}
+                                </span>
+                              </td>
+                              <td>
+                                {shift.location_id === -1 ? (
+                                  <span style={{ color: '#999' }}>-</span>
+                                ) : shift.is_other ? (
+                                  <span style={{ color: '#999' }}>-</span>
+                                ) : hasOffice ? (
+                                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>✓ あり</span>
+                                ) : (
+                                  <span style={{ color: '#999' }}>なし</span>
+                                )}
+                              </td>
+                              <td>
+                                <button className="edit-btn" onClick={() => openEditShiftInfo(shift)}>✏️ 編集</button>
+                                <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
 
-      {/* 時間設定モーダル */}
-      {editingShift && (
-        <div className="modal-overlay" onClick={() => setEditingShift(null)}>
+      {/* シフト情報編集モーダル */}
+      {editingShiftInfo && (
+        <div className="modal-overlay" onClick={cancelEditShiftInfo}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>⏱ 勤務時間設定</h3>
+            <h3>✏️ シフト情報編集</h3>
             <div className="modal-guide">
-              <p><strong>シフト情報:</strong></p>
-              <p>メンバー: {editingShift.member_name}</p>
-              <p>勤務地: {editingShift.location_name}</p>
-              <p>日付: {editingShift.date}</p>
+              <p><strong>元のシフト情報:</strong></p>
+              <p>メンバー: {editingShiftInfo.member_name}</p>
+              <p>勤務地: {editingShiftInfo.location_name}</p>
+              <p>日付: {editingShiftInfo.date}</p>
             </div>
 
             <div className="time-edit-form">
               <div className="form-group">
-                <label>開始時間 <span className="required">*必須</span></label>
-                <input
-                  type="time"
-                  value={editStartTime}
-                  onChange={(e) => setEditStartTime(e.target.value)}
-                />
+                <label>メンバー <span className="required">*必須</span></label>
+                <select
+                  value={editMember}
+                  onChange={(e) => setEditMember(e.target.value)}
+                >
+                  <option value="">選択してください</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
-                <label>終了時間 <span className="required">*必須</span></label>
-                <input
-                  type="time"
-                  value={editEndTime}
-                  onChange={(e) => setEditEndTime(e.target.value)}
-                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={editIsOther}
+                    onChange={(e) => {
+                      setEditIsOther(e.target.checked)
+                      if (e.target.checked) {
+                        setEditLocation('')
+                        setEditIncludeOffice(false)
+                      } else {
+                        setEditOtherActivity('')
+                      }
+                    }}
+                    style={{ width: 'auto', marginRight: '8px' }}
+                  />
+                  その他の活動（研修・営業・休暇など）
+                </label>
               </div>
+
+              {!editIsOther ? (
+                <>
+                  <div className="form-group">
+                    <label>クライアント先 <span className="required">*必須</span></label>
+                    <select
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                    >
+                      <option value="">選択してください</option>
+                      {locations.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={editIncludeOffice}
+                        onChange={(e) => setEditIncludeOffice(e.target.checked)}
+                        style={{ width: 'auto', marginRight: '8px', cursor: 'pointer' }}
+                      />
+                      オフィスにも出勤する
+                    </label>
+                  </div>
+                </>
+              ) : (
+                <div className="form-group">
+                  <label>活動内容 <span className="required">*必須</span></label>
+                  <input
+                    type="text"
+                    value={editOtherActivity}
+                    onChange={(e) => setEditOtherActivity(e.target.value)}
+                    placeholder="例: 新人研修、営業活動、有給休暇"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="modal-actions">
-              <button onClick={saveTime} className="submit-btn">保存</button>
-              <button onClick={() => setEditingShift(null)} className="cancel-btn">キャンセル</button>
+              <button onClick={saveShiftInfo} className="submit-btn">保存</button>
+              <button onClick={cancelEditShiftInfo} className="cancel-btn">キャンセル</button>
             </div>
           </div>
         </div>
@@ -1322,6 +1675,7 @@ function AttendanceManagement() {
   const [clockedIn, setClockedIn] = useState(false)
   const [currentEntry, setCurrentEntry] = useState<any>(null)
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [todayEntry, setTodayEntry] = useState<any>(null)
 
   useEffect(() => {
     loadAttendance()
@@ -1332,6 +1686,28 @@ function AttendanceManagement() {
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(monthStr)
   }, [])
+
+  useEffect(() => {
+    // メンバー選択時に、今日の出勤記録を確認
+    if (selectedMember && attendance.length > 0) {
+      const today = new Date().toISOString().split('T')[0]
+      const entry = attendance.find(
+        a => a.member_id === Number(selectedMember) && a.date === today && !a.clock_out
+      )
+      if (entry) {
+        setTodayEntry(entry)
+        setCurrentEntry(entry)
+        setClockedIn(true)
+        setSelectedLocation(String(entry.location_id))
+      } else {
+        setTodayEntry(null)
+        if (!clockedIn) {
+          setClockedIn(false)
+          setCurrentEntry(null)
+        }
+      }
+    }
+  }, [selectedMember, attendance])
 
   const loadAttendance = () => {
     const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
@@ -1471,7 +1847,6 @@ function AttendanceManagement() {
             <select
               value={selectedMember}
               onChange={(e) => setSelectedMember(e.target.value)}
-              disabled={clockedIn}
             >
               <option value="">選択してください</option>
               {members.map(m => (
@@ -1510,6 +1885,8 @@ function AttendanceManagement() {
               <strong>出勤中:</strong> {currentEntry.member_name} - {currentEntry.location_name}
               <br />
               <strong>出勤時刻:</strong> {currentEntry.clock_in}
+              <br />
+              {todayEntry && <span style={{ color: '#28a745', fontWeight: 'bold' }}>💡 今日の出勤記録が見つかりました。退勤ボタンを押せます。</span>}
             </p>
           </div>
         )}

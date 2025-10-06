@@ -1447,6 +1447,12 @@ table tfoot {
   background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
 }
 
+.mini-shift-card.shift-office,
+.location-badge.location-office {
+  background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+  color: white;
+}
+
 .mini-shift-card.shift-location-0,
 .location-badge.location-0 {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1527,8 +1533,71 @@ table tfoot {
 
 .shift-table-view h4 {
   color: #667eea;
-  margin-bottom: 15px;
+  margin: 0;
   font-size: 18px;
+}
+
+.table-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.bulk-delete-btn {
+  padding: 12px 24px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.bulk-delete-btn:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+}
+
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.date-select-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.reregister-btn {
+  padding: 8px 16px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.reregister-btn:hover {
+  background: #138496;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+.selected-for-delete {
+  background: #ffe6e6 !important;
 }
 
 /* 日付グループ表示 */
