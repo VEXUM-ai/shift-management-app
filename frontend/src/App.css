@@ -877,6 +877,30 @@ table tfoot {
   margin-top: 15px;
 }
 
+/* 時間編集フォーム */
+.time-edit-form {
+  margin: 20px 0;
+}
+
+.time-edit-form .form-group {
+  margin-bottom: 20px;
+}
+
+.time-edit-form input[type="time"] {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+.time-edit-form input[type="time"]:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 
 /* モーダル */
 .modal-overlay {

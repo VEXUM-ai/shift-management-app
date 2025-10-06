@@ -439,9 +439,10 @@ function ShiftManagement() {
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
   const [date, setDate] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [editingShift, setEditingShift] = useState<any>(null)
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -481,8 +482,8 @@ function ShiftManagement() {
   }
 
   const addShift = () => {
-    if (!selectedMember || !selectedLocation || !date || !startTime || !endTime) {
-      alert('すべての項目を入力してください')
+    if (!selectedMember || !selectedLocation || !date) {
+      alert('メンバー、勤務地、日付を入力してください')
       return
     }
 
@@ -496,8 +497,8 @@ function ShiftManagement() {
       location_id: location.id,
       location_name: location.name,
       date,
-      start_time: startTime,
-      end_time: endTime,
+      start_time: null,
+      end_time: null,
       status: '提出済み',
       created_at: new Date().toISOString()
     }
@@ -508,9 +509,34 @@ function ShiftManagement() {
     setSelectedMember('')
     setSelectedLocation('')
     setDate('')
-    setStartTime('')
-    setEndTime('')
     alert('シフトを登録しました')
+  }
+
+  const openEditTime = (shift: any) => {
+    setEditingShift(shift)
+    setEditStartTime(shift.start_time || '')
+    setEditEndTime(shift.end_time || '')
+  }
+
+  const saveTime = () => {
+    if (!editingShift) return
+
+    if (!editStartTime || !editEndTime) {
+      alert('開始時間と終了時間を入力してください')
+      return
+    }
+
+    const updated = shifts.map(s =>
+      s.id === editingShift.id
+        ? { ...s, start_time: editStartTime, end_time: editEndTime, updated_at: new Date().toISOString() }
+        : s
+    )
+
+    saveShifts(updated)
+    setEditingShift(null)
+    setEditStartTime('')
+    setEditEndTime('')
+    alert('時間を設定しました')
   }
 
   const deleteShift = (id: number) => {
@@ -557,10 +583,12 @@ function ShiftManagement() {
         <h3>使い方</h3>
         <ol>
           <li>メンバーと勤務地を選択してください</li>
-          <li>シフトの日付と時間を入力してください</li>
+          <li>シフトの日付を入力してください</li>
           <li>「シフト追加」ボタンをクリックして登録</li>
+          <li>一覧の「時間設定」ボタンで開始・終了時間を後から追加できます</li>
           <li>月を選択してシフトを絞り込み、CSV出力できます</li>
         </ol>
+        <p className="note">💡 基本的な勤務時間は後で一括設定できるため、まず日付のみ提出してください</p>
       </div>
 
       <div className="shift-form">
@@ -590,33 +618,13 @@ function ShiftManagement() {
               ))}
             </select>
           </div>
-        </div>
 
-        <div className="form-row">
           <div className="form-group">
             <label>日付 <span className="required">*必須</span></label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>開始時間 <span className="required">*必須</span></label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>終了時間 <span className="required">*必須</span></label>
-            <input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
             />
           </div>
         </div>
@@ -660,10 +668,11 @@ function ShiftManagement() {
                 <td><strong>{shift.member_name}</strong></td>
                 <td>{shift.location_name}</td>
                 <td>{shift.date}</td>
-                <td>{shift.start_time}</td>
-                <td>{shift.end_time}</td>
+                <td>{shift.start_time || <span className="pending">未設定</span>}</td>
+                <td>{shift.end_time || <span className="pending">未設定</span>}</td>
                 <td><span className="status-badge">{shift.status}</span></td>
                 <td>
+                  <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
                   <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
                 </td>
               </tr>
@@ -674,6 +683,46 @@ function ShiftManagement() {
           <p className="no-data">シフトが登録されていません</p>
         )}
       </div>
+
+      {/* 時間設定モーダル */}
+      {editingShift && (
+        <div className="modal-overlay" onClick={() => setEditingShift(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>⏱ 勤務時間設定</h3>
+            <div className="modal-guide">
+              <p><strong>シフト情報:</strong></p>
+              <p>メンバー: {editingShift.member_name}</p>
+              <p>勤務地: {editingShift.location_name}</p>
+              <p>日付: {editingShift.date}</p>
+            </div>
+
+            <div className="time-edit-form">
+              <div className="form-group">
+                <label>開始時間 <span className="required">*必須</span></label>
+                <input
+                  type="time"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>終了時間 <span className="required">*必須</span></label>
+                <input
+                  type="time"
+                  value={editEndTime}
+                  onChange={(e) => setEditEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveTime} className="submit-btn">保存</button>
+              <button onClick={() => setEditingShift(null)} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
