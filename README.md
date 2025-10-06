@@ -2,130 +2,82 @@
 
 シフト提出、勤怠管理、給与計算を一元管理できるWebアプリケーションです。
 
-## 機能
+## 🎯 主な機能
 
-### 1. シフト管理
-- シフトの提出（日付、開始時間、終了時間）
-- 提出済みシフトの一覧表示
-- シフトの編集・削除
+### 1. メンバー管理
+- メンバーの登録・削除
+- 名前とメールアドレスの管理
 
-### 2. 勤怠管理
+### 2. 常駐先管理
+- **常駐先・オフィスの登録**
+- **会社ロゴの画像アップロード対応** 📷
+- 常駐先ごとに異なる時給を設定
+- 常駐先ごとの交通費設定（オフィス/常駐先で分離）
+- カード形式で視覚的に表示
+
+### 3. シフト管理
+- **一括シフト登録機能**
+- **月ごとのシフト履歴表示** 📅
+- メンバーと勤務地を選択形式で入力
+- 交通費の自動入力（常駐先設定から）
+- 常駐先ロゴを含むシフト一覧表示
+- **CSV出力機能**
+- **Slack通知機能** 🔔
+
+### 4. 勤怠管理
 - 出勤・退勤の打刻
+- 出勤先（オフィス/常駐先）の選択
 - 勤務時間の自動計算
 - 勤怠履歴の表示
 
-### 3. 給与計算
-- 時給と勤務時間から給与を計算
-- 給与履歴の保存・表示
-- 月別の給与管理
+### 5. 給与計算
+- **出勤先別の給与計算**
+- メンバー・月を選択して計算
+- 出勤先ごとの勤務時間と給与を表示
+- 合計時間と合計給与を自動計算
+- 交通費込みの給与計算
 
-## 技術スタック
+## 🚀 技術スタック
 
 ### フロントエンド
 - React 18
 - TypeScript
 - Vite
+- jsPDF (PDF出力用)
 - CSS3
 
 ### バックエンド
+- Vercel Serverless Functions
 - Node.js
-- Express
 - TypeScript
-- SQLite3
 
-## セットアップ
+### デプロイ
+- Vercel
+- GitHub連携
 
-### 前提条件
-- Node.js 18以上
-- npm または yarn
+## 📦 セットアップ
 
-### インストール
+### Vercel環境変数設定
 
-1. リポジトリをクローン
-```bash
-git clone <repository-url>
-cd shift-management-app
+Slack通知を有効にする場合、Vercelで以下の環境変数を設定してください：
+
+```
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 ```
 
-2. 依存パッケージをインストール
-```bash
-npm install
-cd frontend && npm install
-cd ../backend && npm install
-cd ..
-```
+## 📝 主要な改善点
 
-### 開発環境の起動
+### ✨ 最新の追加機能
+- **ロゴ画像アップロード**: 常駐先ごとに会社ロゴを設定可能
+- **月別シフト表示**: 月ごとにシフトを整理して表示
+- **交通費管理**: オフィス/常駐先で交通費を分けて管理
+- **CSV出力**: 月別のシフトデータをCSV形式でエクスポート
+- **Slack通知**: シフト登録時に自動通知
 
-ルートディレクトリから以下のコマンドを実行すると、フロントエンドとバックエンドが同時に起動します：
-
-```bash
-npm run dev
-```
-
-または、個別に起動：
-
-```bash
-# フロントエンド（ポート5173）
-npm run dev:frontend
-
-# バックエンド（ポート3000）
-npm run dev:backend
-```
-
-## API エンドポイント
-
-### シフト管理
-- `GET /api/shifts` - 全シフト取得
-- `POST /api/shifts` - シフト作成
-- `PUT /api/shifts/:id` - シフト更新
-- `DELETE /api/shifts/:id` - シフト削除
-
-### 勤怠管理
-- `GET /api/attendance` - 全勤怠記録取得
-- `POST /api/attendance/clock-in` - 出勤打刻
-- `PUT /api/attendance/clock-out/:id` - 退勤打刻
-- `DELETE /api/attendance/:id` - 勤怠記録削除
-
-### 給与計算
-- `GET /api/salary` - 全給与記録取得
-- `POST /api/salary/calculate` - 給与計算
-- `GET /api/salary/:employee/:month` - 従業員・月別給与取得
-- `DELETE /api/salary/:id` - 給与記録削除
-
-## データベース
-
-SQLiteを使用しています。データベースファイルは `backend/data.db` に作成されます。
-
-### テーブル構造
-
-**shifts（シフト）**
-- id: 主キー
-- employee_name: 従業員名
-- date: 日付
-- start_time: 開始時間
-- end_time: 終了時間
-- status: ステータス
-- created_at: 作成日時
-
-**attendance（勤怠）**
-- id: 主キー
-- employee_name: 従業員名
-- date: 日付
-- clock_in: 出勤時刻
-- clock_out: 退勤時刻
-- total_hours: 勤務時間
-- created_at: 作成日時
-
-**salary（給与）**
-- id: 主キー
-- employee_name: 従業員名
-- month: 月
-- hourly_wage: 時給
-- total_hours: 総勤務時間
-- total_salary: 総給与
-- created_at: 作成日時
-
-## ライセンス
+## 📄 ライセンス
 
 MIT
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

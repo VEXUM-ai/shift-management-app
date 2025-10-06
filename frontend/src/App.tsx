@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { LocationWithLogo, ShiftWithMonthlyView } from './components-enhanced'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
 
@@ -49,8 +50,8 @@ function App() {
 
       <main>
         {activeTab === 'members' && <MemberManagement />}
-        {activeTab === 'locations' && <LocationManagement />}
-        {activeTab === 'shift' && <ShiftManagement />}
+        {activeTab === 'locations' && <LocationWithLogo />}
+        {activeTab === 'shift' && <ShiftWithMonthlyView />}
         {activeTab === 'attendance' && <AttendanceManagement />}
         {activeTab === 'salary' && <SalaryCalculation />}
       </main>
