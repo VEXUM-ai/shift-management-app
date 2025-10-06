@@ -668,10 +668,45 @@ function ShiftManagement() {
   }
 
   const filteredShifts = selectedMonth
-    ? shifts.filter(s => s.date.startsWith(selectedMonth))
-    : shifts
+    ? shifts.filter(s => s.date.startsWith(selectedMonth)).sort((a, b) => a.date.localeCompare(b.date))
+    : shifts.sort((a, b) => a.date.localeCompare(b.date))
 
   const calendarDates = generateCalendarDates()
+
+  // カレンダービュー用のデータ構造を生成
+  const generateCalendarView = () => {
+    if (!selectedMonth) return []
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const lastDay = new Date(year, month, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const calendar: any[] = []
+
+    // 月の最初の曜日まで空白を追加
+    for (let i = 0; i < startDayOfWeek; i++) {
+      calendar.push({ isEmpty: true })
+    }
+
+    // 各日付のシフトデータを集約
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const dayShifts = shifts.filter(s => s.date === dateStr)
+
+      calendar.push({
+        date: dateStr,
+        day,
+        shifts: dayShifts,
+        dayOfWeek: new Date(dateStr).getDay()
+      })
+    }
+
+    return calendar
+  }
+
+  const calendarView = generateCalendarView()
 
   return (
     <div className="section">
@@ -807,7 +842,7 @@ function ShiftManagement() {
       </div>
 
       <div className="filter-section">
-        <h3>📊 シフト一覧</h3>
+        <h3>📊 シフト確認</h3>
         <div className="filter-bar">
           <div className="form-group">
             <label>月で絞り込み</label>
@@ -821,39 +856,94 @@ function ShiftManagement() {
         </div>
       </div>
 
-      <div className="shifts-table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>メンバー</th>
-              <th>勤務地</th>
-              <th>日付</th>
-              <th>開始時間</th>
-              <th>終了時間</th>
-              <th>ステータス</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredShifts.map((shift) => (
-              <tr key={shift.id}>
-                <td><strong>{shift.member_name}</strong></td>
-                <td>{shift.location_name}</td>
-                <td>{shift.date}</td>
-                <td>{shift.start_time || <span className="pending">未設定</span>}</td>
-                <td>{shift.end_time || <span className="pending">未設定</span>}</td>
-                <td><span className="status-badge">{shift.status}</span></td>
-                <td>
-                  <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
-                  <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredShifts.length === 0 && (
-          <p className="no-data">シフトが登録されていません</p>
+      {/* カレンダービュー */}
+      <div className="shift-calendar-view">
+        <h4>📅 カレンダー表示</h4>
+        <div className="calendar-view-grid">
+          <div className="calendar-view-header sunday">日</div>
+          <div className="calendar-view-header">月</div>
+          <div className="calendar-view-header">火</div>
+          <div className="calendar-view-header">水</div>
+          <div className="calendar-view-header">木</div>
+          <div className="calendar-view-header">金</div>
+          <div className="calendar-view-header saturday">土</div>
+
+          {calendarView.map((cell, index) => {
+            if (cell.isEmpty) {
+              return <div key={`empty-${index}`} className="calendar-view-cell empty"></div>
+            }
+
+            const isWeekend = cell.dayOfWeek === 0 || cell.dayOfWeek === 6
+            const hasShifts = cell.shifts.length > 0
+
+            return (
+              <div
+                key={cell.date}
+                className={`calendar-view-cell ${isWeekend ? 'weekend' : ''} ${hasShifts ? 'has-shifts' : ''}`}
+              >
+                <div className="cell-date">
+                  {cell.day}
+                  {hasShifts && <span className="shift-count-badge">{cell.shifts.length}</span>}
+                </div>
+                <div className="cell-shifts">
+                  {cell.shifts.map((shift: any) => (
+                    <div key={shift.id} className="mini-shift-card" onClick={() => openEditTime(shift)}>
+                      <div className="mini-shift-member">{shift.member_name}</div>
+                      <div className="mini-shift-location">{shift.location_name}</div>
+                      {shift.start_time && shift.end_time && (
+                        <div className="mini-shift-time">
+                          {shift.start_time}-{shift.end_time}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {calendarView.length === 0 && (
+          <p className="no-data">月を選択してください</p>
         )}
+      </div>
+
+      {/* テーブルビュー */}
+      <div className="shift-table-view">
+        <h4>📋 リスト表示（日付順）</h4>
+        <div className="shifts-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>メンバー</th>
+                <th>勤務地</th>
+                <th>開始時間</th>
+                <th>終了時間</th>
+                <th>ステータス</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredShifts.map((shift) => (
+                <tr key={shift.id}>
+                  <td><strong>{shift.date}</strong></td>
+                  <td>{shift.member_name}</td>
+                  <td>{shift.location_name}</td>
+                  <td>{shift.start_time || <span className="pending">未設定</span>}</td>
+                  <td>{shift.end_time || <span className="pending">未設定</span>}</td>
+                  <td><span className="status-badge">{shift.status}</span></td>
+                  <td>
+                    <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
+                    <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredShifts.length === 0 && (
+            <p className="no-data">シフトが登録されていません</p>
+          )}
+        </div>
       </div>
 
       {/* 時間設定モーダル */}

@@ -1274,6 +1274,157 @@ table tfoot {
   background: #5a6268;
 }
 
+/* シフトカレンダービュー */
+.shift-calendar-view {
+  margin: 30px 0;
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  border: 2px solid #667eea;
+}
+
+.shift-calendar-view h4 {
+  color: #667eea;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.calendar-view-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.calendar-view-header {
+  padding: 12px;
+  text-align: center;
+  font-weight: bold;
+  color: #667eea;
+  background: #f8f9fa;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.calendar-view-header.sunday {
+  color: #dc3545;
+}
+
+.calendar-view-header.saturday {
+  color: #17a2b8;
+}
+
+.calendar-view-cell {
+  min-height: 120px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
+}
+
+.calendar-view-cell.empty {
+  background: #f8f9fa;
+  border: 1px dashed #ddd;
+}
+
+.calendar-view-cell.weekend {
+  background: #f0f8ff;
+}
+
+.calendar-view-cell.has-shifts {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.calendar-view-cell:hover:not(.empty) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+.cell-date {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.calendar-view-cell.weekend .cell-date {
+  color: #dc3545;
+}
+
+.shift-count-badge {
+  background: #667eea;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.cell-shifts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.mini-shift-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 2px solid transparent;
+}
+
+.mini-shift-card:hover {
+  transform: scale(1.05);
+  border-color: #ffd700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mini-shift-member {
+  font-weight: bold;
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.mini-shift-location {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.mini-shift-time {
+  font-size: 10px;
+  font-weight: bold;
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* テーブルビュー */
+.shift-table-view {
+  margin: 30px 0;
+}
+
+.shift-table-view h4 {
+  color: #667eea;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
 @media (max-width: 768px) {
   .calendar-grid {
     gap: 4px;
@@ -1307,5 +1458,27 @@ table tfoot {
 
   .bulk-submit-section button {
     width: 100%;
+  }
+
+  .calendar-view-grid {
+    gap: 5px;
+  }
+
+  .calendar-view-cell {
+    min-height: 100px;
+    padding: 5px;
+  }
+
+  .cell-date {
+    font-size: 14px;
+  }
+
+  .mini-shift-card {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .mini-shift-member {
+    font-size: 11px;
   }
 }
