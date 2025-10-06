@@ -10,34 +10,56 @@ const STORAGE_KEYS = {
   LOCATIONS: 'shift_app_locations',
   SHIFTS: 'shift_app_shifts',
   ATTENDANCE: 'shift_app_attendance',
-  USER_ROLE: 'shift_app_user_role'
+  USER_ROLE: 'shift_app_user_role',
+  SELECTED_MEMBER_ID: 'shift_app_selected_member_id'
 }
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('shift')
   const [userRole, setUserRole] = useState<UserRole>('member')
   const [isRoleSelected, setIsRoleSelected] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
+  const [members, setMembers] = useState<any[]>([])
 
   useEffect(() => {
     const storedRole = localStorage.getItem(STORAGE_KEYS.USER_ROLE)
-    if (storedRole) {
+    const storedMemberId = localStorage.getItem(STORAGE_KEYS.SELECTED_MEMBER_ID)
+    const storedMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+
+    if (storedMembers) {
+      setMembers(JSON.parse(storedMembers))
+    }
+
+    if (storedRole && storedMemberId) {
       setUserRole(storedRole as UserRole)
+      setSelectedMemberId(Number(storedMemberId))
+      setIsRoleSelected(true)
+    } else if (storedRole === 'admin') {
+      setUserRole('admin')
       setIsRoleSelected(true)
     }
   }, [])
 
-  const selectRole = (role: UserRole) => {
+  const selectRole = (role: UserRole, memberId?: number) => {
     setUserRole(role)
     setIsRoleSelected(true)
     localStorage.setItem(STORAGE_KEYS.USER_ROLE, role)
+    if (memberId) {
+      setSelectedMemberId(memberId)
+      localStorage.setItem(STORAGE_KEYS.SELECTED_MEMBER_ID, String(memberId))
+    }
   }
 
   const switchRole = () => {
     setIsRoleSelected(false)
+    setSelectedMemberId(null)
     localStorage.removeItem(STORAGE_KEYS.USER_ROLE)
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_MEMBER_ID)
   }
 
   if (!isRoleSelected) {
+    const adminMembers = members.filter(m => m.is_admin)
+
     return (
       <div className="app">
         <div className="role-selection">
@@ -46,19 +68,56 @@ function App() {
           <div className="role-buttons">
             <button className="role-btn admin-btn" onClick={() => selectRole('admin')}>
               <span className="role-icon">👔</span>
-              <span className="role-title">管理者</span>
+              <span className="role-title">管理者（全体）</span>
               <span className="role-desc">メンバー管理・給与設定・全機能利用可能</span>
             </button>
-            <button className="role-btn member-btn" onClick={() => selectRole('member')}>
-              <span className="role-icon">👤</span>
-              <span className="role-title">メンバー</span>
-              <span className="role-desc">シフト提出・勤怠打刻のみ</span>
-            </button>
+            {adminMembers.length > 0 && (
+              <div style={{ width: '100%', marginTop: '20px' }}>
+                <h3 style={{ textAlign: 'center', marginBottom: '15px', color: '#667eea' }}>
+                  👥 管理権限を持つメンバー
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {adminMembers.map(member => (
+                    <button
+                      key={member.id}
+                      className="role-btn member-btn"
+                      onClick={() => selectRole('admin', member.id)}
+                      style={{ padding: '15px' }}
+                    >
+                      <span className="role-icon">👔</span>
+                      <span className="role-title">{member.name}</span>
+                      <span className="role-desc">個人ページ + 管理機能</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ width: '100%', marginTop: '20px' }}>
+              <h3 style={{ textAlign: 'center', marginBottom: '15px', color: '#764ba2' }}>
+                👤 一般メンバー
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {members.filter(m => !m.is_admin).map(member => (
+                  <button
+                    key={member.id}
+                    className="role-btn member-btn"
+                    onClick={() => selectRole('member', member.id)}
+                    style={{ padding: '15px' }}
+                  >
+                    <span className="role-icon">👤</span>
+                    <span className="role-title">{member.name}</span>
+                    <span className="role-desc">シフト提出・勤怠打刻のみ</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     )
   }
+
+  const currentMember = selectedMemberId ? members.find(m => m.id === selectedMemberId) : null
 
   return (
     <div className="app">
@@ -66,7 +125,15 @@ function App() {
         <h1>勤怠・シフト管理システム</h1>
         <div className="user-info">
           <span className="current-role">
-            {userRole === 'admin' ? '👔 管理者' : '👤 メンバー'}
+            {currentMember ? (
+              <>
+                {userRole === 'admin' && currentMember.is_admin ? '👔' : '👤'} {currentMember.name}
+              </>
+            ) : (
+              <>
+                {userRole === 'admin' ? '👔 管理者（全体）' : '👤 メンバー'}
+              </>
+            )}
           </span>
           <button className="switch-role-btn" onClick={switchRole}>
             🔄 切り替え
@@ -116,9 +183,9 @@ function App() {
       <main>
         {activeTab === 'members' && userRole === 'admin' && <MemberManagement />}
         {activeTab === 'locations' && userRole === 'admin' && <LocationManagement />}
-        {activeTab === 'shift' && <ShiftManagement />}
-        {activeTab === 'attendance' && <AttendanceManagement />}
-        {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation />}
+        {activeTab === 'shift' && <ShiftManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
+        {activeTab === 'attendance' && <AttendanceManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
+        {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
       </main>
     </div>
   )
@@ -133,6 +200,7 @@ function MemberManagement() {
   const [salaryType, setSalaryType] = useState<'hourly' | 'fixed'>('hourly')
   const [hourlyWage, setHourlyWage] = useState('')
   const [fixedSalary, setFixedSalary] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [editingMember, setEditingMember] = useState<any>(null)
 
   useEffect(() => {
@@ -179,6 +247,7 @@ function MemberManagement() {
               salary_type: salaryType,
               hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
               fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
+              is_admin: isAdmin,
             }
           : m
       )
@@ -195,6 +264,7 @@ function MemberManagement() {
         salary_type: salaryType,
         hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
         fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
+        is_admin: isAdmin,
         created_at: new Date().toISOString()
       }
 
@@ -209,6 +279,7 @@ function MemberManagement() {
     setHourlyWage('')
     setFixedSalary('')
     setSalaryType('hourly')
+    setIsAdmin(false)
   }
 
   const editMember = (member: any) => {
@@ -219,6 +290,7 @@ function MemberManagement() {
     setSalaryType(member.salary_type)
     setHourlyWage(member.salary_type === 'hourly' ? String(member.hourly_wage || '') : '')
     setFixedSalary(member.salary_type === 'fixed' ? String(member.fixed_salary || '') : '')
+    setIsAdmin(member.is_admin || false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -230,6 +302,7 @@ function MemberManagement() {
     setHourlyWage('')
     setFixedSalary('')
     setSalaryType('hourly')
+    setIsAdmin(false)
   }
 
   const deleteMember = (id: number) => {
@@ -399,6 +472,23 @@ function MemberManagement() {
           </div>
         </div>
 
+        <div className="form-row">
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+              <input
+                type="checkbox"
+                checked={isAdmin}
+                onChange={(e) => setIsAdmin(e.target.checked)}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span>👔 管理権限を付与（このメンバーに管理機能へのアクセスを許可）</span>
+            </label>
+            <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f8ff', borderRadius: '5px', fontSize: '14px', color: '#555' }}>
+              💡 管理権限を持つメンバーは、ログイン画面で自分の名前を選択して個人ページ + 全管理機能にアクセスできます
+            </div>
+          </div>
+        </div>
+
         <div className="form-actions">
           <button onClick={addMember} className="submit-btn">
             {editingMember ? '💾 更新' : '➕ メンバー追加'}
@@ -440,6 +530,7 @@ function MemberManagement() {
               <th>給与形態</th>
               <th>給与額</th>
               <th>オフィス交通費</th>
+              <th>管理権限</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -460,6 +551,13 @@ function MemberManagement() {
                   }
                 </td>
                 <td>¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日</td>
+                <td>
+                  {member.is_admin ? (
+                    <span style={{ color: '#667eea', fontWeight: 'bold' }}>👔 管理者</span>
+                  ) : (
+                    <span style={{ color: '#999' }}>-</span>
+                  )}
+                </td>
                 <td>
                   <button className="edit-btn" onClick={() => editMember(member)}>✏️ 編集</button>
                   <button className="delete-btn" onClick={() => deleteMember(member.id)}>削除</button>
@@ -764,15 +862,17 @@ function LocationManagement() {
 }
 
 // シフト管理
-function ShiftManagement() {
+function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
   const [shifts, setShifts] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
   const [attendance, setAttendance] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [otherActivity, setOtherActivity] = useState('')
   const [isOtherSelected, setIsOtherSelected] = useState(false)
+  const [memberType, setMemberType] = useState<'resident' | 'advisor'>('resident')
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [editingShift, setEditingShift] = useState<any>(null)
@@ -801,7 +901,12 @@ function ShiftManagement() {
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(monthStr)
     setCalendarMonth(monthStr)
-  }, [])
+
+    // 個人ページの場合は自動的にメンバーを選択
+    if (selectedMemberId) {
+      setSelectedMember(String(selectedMemberId))
+    }
+  }, [selectedMemberId])
 
   const loadAttendance = () => {
     const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
@@ -929,7 +1034,7 @@ function ShiftManagement() {
       return
     }
 
-    if (!isOtherSelected && !selectedLocation) {
+    if (memberType === 'resident' && !isOtherSelected && selectedLocations.length === 0) {
       alert('勤務地を選択するか、「その他」を選択してください')
       return
     }
@@ -945,58 +1050,78 @@ function ShiftManagement() {
     }
 
     const member = members.find(m => m.id === Number(selectedMember))
-
-    let locationData = {
-      id: null,
-      name: ''
-    }
-
-    if (isOtherSelected) {
-      locationData = {
-        id: 0,
-        name: `その他: ${otherActivity}`
-      }
-    } else {
-      const location = locations.find(l => l.id === Number(selectedLocation))
-      locationData = {
-        id: location.id,
-        name: location.name
-      }
-    }
-
     const newShifts: any[] = []
 
-    selectedDates.forEach((date, index) => {
-      // クライアント先のシフト
-      newShifts.push({
-        id: Date.now() + index * 2,
-        member_id: member.id,
-        member_name: member.name,
-        location_id: locationData.id,
-        location_name: locationData.name,
-        is_other: isOtherSelected,
-        date,
-        start_time: null,
-        end_time: null,
-        status: '提出済み',
-        created_at: new Date().toISOString()
-      })
-
-      // オフィスのシフトも追加
-      if (includeOffice && !isOtherSelected) {
+    selectedDates.forEach((date, dateIndex) => {
+      if (isOtherSelected) {
+        // その他の活動
         newShifts.push({
-          id: Date.now() + index * 2 + 1,
+          id: Date.now() + dateIndex * 100,
           member_id: member.id,
           member_name: member.name,
-          location_id: -1,
-          location_name: 'オフィス',
-          is_other: false,
+          location_id: 0,
+          location_name: `その他: ${otherActivity}`,
+          is_other: true,
+          member_type: memberType,
           date,
           start_time: null,
           end_time: null,
           status: '提出済み',
           created_at: new Date().toISOString()
         })
+      } else if (memberType === 'advisor') {
+        // アドバイザー（常駐先なし）
+        newShifts.push({
+          id: Date.now() + dateIndex * 100,
+          member_id: member.id,
+          member_name: member.name,
+          location_id: -2,
+          location_name: 'アドバイザー',
+          is_other: false,
+          member_type: memberType,
+          date,
+          start_time: null,
+          end_time: null,
+          status: '提出済み',
+          created_at: new Date().toISOString()
+        })
+      } else {
+        // 常駐人材（複数のクライアント先）
+        selectedLocations.forEach((locationId, locIndex) => {
+          const location = locations.find(l => l.id === Number(locationId))
+          newShifts.push({
+            id: Date.now() + dateIndex * 100 + locIndex * 10,
+            member_id: member.id,
+            member_name: member.name,
+            location_id: location.id,
+            location_name: location.name,
+            is_other: false,
+            member_type: memberType,
+            date,
+            start_time: null,
+            end_time: null,
+            status: '提出済み',
+            created_at: new Date().toISOString()
+          })
+        })
+
+        // オフィスのシフトも追加
+        if (includeOffice) {
+          newShifts.push({
+            id: Date.now() + dateIndex * 100 + 99,
+            member_id: member.id,
+            member_name: member.name,
+            location_id: -1,
+            location_name: 'オフィス',
+            is_other: false,
+            member_type: memberType,
+            date,
+            start_time: null,
+            end_time: null,
+            status: '提出済み',
+            created_at: new Date().toISOString()
+          })
+        }
       }
     })
 
@@ -1005,9 +1130,11 @@ function ShiftManagement() {
 
     setSelectedMember('')
     setSelectedLocation('')
+    setSelectedLocations([])
     setOtherActivity('')
     setIsOtherSelected(false)
     setIncludeOffice(false)
+    setMemberType('resident')
     setSelectedDates([])
     alert(`${newShifts.length}件のシフトを登録しました`)
   }
@@ -1337,6 +1464,11 @@ function ShiftManagement() {
         .sort((a, b) => a.date.localeCompare(b.date))
     : shifts.map(getShiftWithAttendance).sort((a, b) => a.date.localeCompare(b.date))
 
+  // 個人ページの場合は自動的にフィルタリング
+  if (selectedMemberId) {
+    filteredShifts = filteredShifts.filter(s => s.member_id === selectedMemberId)
+  }
+
   // メンバーフィルター適用
   if (filterMember) {
     filteredShifts = filteredShifts.filter(s => s.member_id === Number(filterMember))
@@ -1370,10 +1502,15 @@ function ShiftManagement() {
       calendar.push({ isEmpty: true })
     }
 
+    // 個人ページの場合はフィルタリング
+    const filteredShifts = selectedMemberId
+      ? shifts.filter(s => s.member_id === selectedMemberId)
+      : shifts
+
     // 各日付のシフトデータを集約
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dayShifts = shifts.filter(s => s.date === dateStr)
+      const dayShifts = filteredShifts.filter(s => s.date === dateStr)
 
       calendar.push({
         date: dateStr,
@@ -1388,9 +1525,19 @@ function ShiftManagement() {
 
   const calendarView = generateCalendarView()
 
+  // 個人ページの場合はフィルタリング
+  const displayShifts = selectedMemberId
+    ? shifts.filter(s => s.member_id === selectedMemberId)
+    : shifts
+
   return (
     <div className="section">
-      <h2>📅 シフト管理</h2>
+      <h2>📅 シフト管理{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+      {selectedMemberId && currentMemberName && (
+        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+          👤 {currentMemberName}さんのシフトのみを表示しています
+        </div>
+      )}
       <div className="guide-box">
         <h3>✨ プロフェッショナル機能</h3>
         <ol>
@@ -1406,17 +1553,39 @@ function ShiftManagement() {
 
       <div className="shift-form">
         <h3>🎯 基本情報</h3>
+        {!selectedMemberId && (
+          <div className="form-row">
+            <div className="form-group">
+              <label>メンバー <span className="required">*必須</span></label>
+              <select
+                value={selectedMember}
+                onChange={(e) => setSelectedMember(e.target.value)}
+              >
+                <option value="">選択してください</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <div className="form-row">
           <div className="form-group">
-            <label>メンバー <span className="required">*必須</span></label>
+            <label>人材タイプ <span className="required">*必須</span></label>
             <select
-              value={selectedMember}
-              onChange={(e) => setSelectedMember(e.target.value)}
+              value={memberType}
+              onChange={(e) => {
+                setMemberType(e.target.value as 'resident' | 'advisor')
+                if (e.target.value === 'advisor') {
+                  setSelectedLocations([])
+                  setIncludeOffice(false)
+                  setIsOtherSelected(false)
+                }
+              }}
             >
-              <option value="">選択してください</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
+              <option value="resident">👥 常駐人材（クライアント先に常駐）</option>
+              <option value="advisor">💼 アドバイザー（常駐なし）</option>
             </select>
           </div>
         </div>
@@ -1430,32 +1599,55 @@ function ShiftManagement() {
                 onChange={(e) => {
                   setIsOtherSelected(e.target.checked)
                   if (e.target.checked) {
-                    setSelectedLocation('')
+                    setSelectedLocations([])
+                    setMemberType('resident')
                   } else {
                     setOtherActivity('')
                   }
                 }}
                 style={{ width: 'auto', marginRight: '8px' }}
+                disabled={memberType === 'advisor'}
               />
               その他の活動（研修・営業・休暇など）
             </label>
           </div>
         </div>
 
-        {!isOtherSelected ? (
+        {!isOtherSelected && memberType === 'resident' ? (
           <>
             <div className="form-row">
               <div className="form-group">
-                <label>クライアント先 <span className="required">*必須</span></label>
-                <select
-                  value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
-                >
-                  <option value="">選択してください</option>
-                  {locations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
+                <label>クライアント先 <span className="required">*必須（複数選択可）</span></label>
+                <div style={{ border: '2px solid #ddd', borderRadius: '8px', padding: '15px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {locations.length === 0 ? (
+                    <div style={{ color: '#999' }}>クライアント先が登録されていません</div>
+                  ) : (
+                    locations.map(l => (
+                      <div key={l.id} style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedLocations.includes(String(l.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLocations([...selectedLocations, String(l.id)])
+                              } else {
+                                setSelectedLocations(selectedLocations.filter(id => id !== String(l.id)))
+                              }
+                            }}
+                            style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '15px' }}>{l.name}</span>
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {selectedLocations.length > 0 && (
+                  <div style={{ marginTop: '10px', color: '#667eea', fontWeight: 'bold' }}>
+                    ✓ {selectedLocations.length}件のクライアント先を選択中
+                  </div>
+                )}
               </div>
             </div>
             <div className="form-row">
@@ -1472,7 +1664,11 @@ function ShiftManagement() {
               </div>
             </div>
           </>
-        ) : (
+        ) : memberType === 'advisor' && !isOtherSelected ? (
+          <div className="info-text" style={{ margin: '20px 0' }}>
+            💼 アドバイザーは常駐先を選択する必要がありません。日付を選択して登録してください。
+          </div>
+        ) : isOtherSelected ? (
           <div className="form-row">
             <div className="form-group">
               <label>活動内容 <span className="required">*必須</span></label>
@@ -1634,6 +1830,8 @@ function ShiftManagement() {
                     // クライアント先ごとに色を決定
                     const colorClass = shift.is_other
                       ? 'shift-other'
+                      : shift.location_id === -2
+                      ? 'shift-advisor'
                       : shift.location_id === -1
                       ? 'shift-office'
                       : `shift-location-${shift.location_id % 10}`
@@ -1739,11 +1937,13 @@ function ShiftManagement() {
                                     <span className={`location-badge ${
                                       shift.is_other
                                         ? 'location-other'
+                                        : shift.location_id === -2
+                                        ? 'location-advisor'
                                         : `location-${shift.location_id % 10}`
                                     }`}>
                                       {shift.location_name}
                                     </span>
-                                    {hasOffice && !shift.is_other && (
+                                    {hasOffice && !shift.is_other && shift.location_id !== -2 && (
                                       <span className="location-badge location-office" style={{ fontSize: '11px' }}>
                                         🏢 オフィス
                                       </span>
@@ -1751,7 +1951,7 @@ function ShiftManagement() {
                                   </div>
                                 </td>
                                 <td>
-                                  {shift.is_other ? (
+                                  {shift.is_other || shift.location_id === -2 ? (
                                     <span style={{ color: '#999' }}>-</span>
                                   ) : hasOffice ? (
                                     <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '18px' }}>🏢</span>
@@ -1874,7 +2074,7 @@ function ShiftManagement() {
 }
 
 // 勤怠管理
-function AttendanceManagement() {
+function AttendanceManagement({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
   const [attendance, setAttendance] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
@@ -1893,7 +2093,12 @@ function AttendanceManagement() {
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(monthStr)
-  }, [])
+
+    // 個人ページの場合は自動的にメンバーを選択
+    if (selectedMemberId) {
+      setSelectedMember(String(selectedMemberId))
+    }
+  }, [selectedMemberId])
 
   useEffect(() => {
     // メンバー選択時に、今日の出勤記録を確認
@@ -2031,13 +2236,23 @@ function AttendanceManagement() {
     link.click()
   }
 
-  const filteredAttendance = selectedMonth
+  let filteredAttendance = selectedMonth
     ? attendance.filter(a => a.date.startsWith(selectedMonth))
     : attendance
 
+  // 個人ページの場合はフィルタリング
+  if (selectedMemberId) {
+    filteredAttendance = filteredAttendance.filter(a => a.member_id === selectedMemberId)
+  }
+
   return (
     <div className="section">
-      <h2>⏰ 勤怠管理</h2>
+      <h2>⏰ 勤怠管理{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+      {selectedMemberId && currentMemberName && (
+        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+          👤 {currentMemberName}さんの勤怠のみを表示しています
+        </div>
+      )}
       <div className="guide-box">
         <h3>使い方</h3>
         <ol>
@@ -2050,18 +2265,20 @@ function AttendanceManagement() {
 
       <div className="attendance-form">
         <div className="form-row">
-          <div className="form-group">
-            <label>メンバー</label>
-            <select
-              value={selectedMember}
-              onChange={(e) => setSelectedMember(e.target.value)}
-            >
-              <option value="">選択してください</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
+          {!selectedMemberId && (
+            <div className="form-group">
+              <label>メンバー</label>
+              <select
+                value={selectedMember}
+                onChange={(e) => setSelectedMember(e.target.value)}
+              >
+                <option value="">選択してください</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="form-group">
             <label>勤務地</label>
@@ -2153,7 +2370,7 @@ function AttendanceManagement() {
 }
 
 // 給与計算
-function SalaryCalculation() {
+function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
   const [members, setMembers] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
   const [attendance, setAttendance] = useState<any[]>([])
@@ -2169,7 +2386,19 @@ function SalaryCalculation() {
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(monthStr)
-  }, [])
+
+    // 個人ページの場合は自動的にメンバーを選択
+    if (selectedMemberId) {
+      setSelectedMember(String(selectedMemberId))
+    }
+  }, [selectedMemberId])
+
+  // 個人ページで自動計算
+  useEffect(() => {
+    if (selectedMemberId && selectedMember && selectedMonth && members.length > 0 && attendance.length > 0) {
+      calculateSalary()
+    }
+  }, [selectedMemberId, selectedMember, selectedMonth, members, attendance])
 
   const loadMembers = () => {
     const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
@@ -2311,7 +2540,12 @@ function SalaryCalculation() {
 
   return (
     <div className="section">
-      <h2>💰 給与計算</h2>
+      <h2>💰 給与計算{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+      {selectedMemberId && currentMemberName && (
+        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+          👤 {currentMemberName}さんの給与のみを表示しています
+        </div>
+      )}
       <div className="guide-box">
         <h3>使い方</h3>
         <ol>
@@ -2325,18 +2559,20 @@ function SalaryCalculation() {
 
       <div className="salary-form">
         <div className="form-row">
-          <div className="form-group">
-            <label>メンバー <span className="required">*必須</span></label>
-            <select
-              value={selectedMember}
-              onChange={(e) => setSelectedMember(e.target.value)}
-            >
-              <option value="">選択してください</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
+          {!selectedMemberId && (
+            <div className="form-group">
+              <label>メンバー <span className="required">*必須</span></label>
+              <select
+                value={selectedMember}
+                onChange={(e) => setSelectedMember(e.target.value)}
+              >
+                <option value="">選択してください</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="form-group">
             <label>対象月 <span className="required">*必須</span></label>

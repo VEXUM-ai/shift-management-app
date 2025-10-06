@@ -1453,6 +1453,12 @@ table tfoot {
   color: white;
 }
 
+.mini-shift-card.shift-advisor,
+.location-badge.location-advisor {
+  background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+  color: white;
+}
+
 .mini-shift-card.shift-location-0,
 .location-badge.location-0 {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
