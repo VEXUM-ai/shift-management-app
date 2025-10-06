@@ -29,14 +29,15 @@ header h1 {
   gap: 10px;
   margin-bottom: 20px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .tabs button {
-  padding: 12px 24px;
+  padding: 12px 20px;
   border: none;
   background: white;
   color: #667eea;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   border-radius: 8px;
   cursor: pointer;
@@ -57,7 +58,7 @@ main {
   padding: 30px;
   border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -81,7 +82,8 @@ main {
   flex-wrap: wrap;
 }
 
-.form input {
+.form input,
+.form select {
   padding: 10px;
   border: 2px solid #ddd;
   border-radius: 5px;
@@ -90,7 +92,8 @@ main {
   min-width: 150px;
 }
 
-.form input:focus {
+.form input:focus,
+.form select:focus {
   outline: none;
   border-color: #667eea;
 }
@@ -117,6 +120,84 @@ main {
 .clock-buttons button:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+/* シフト一括登録 */
+.bulk-shift-form {
+  margin-bottom: 30px;
+}
+
+.shift-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.shift-row select,
+.shift-row input {
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.shift-row select:focus,
+.shift-row input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.bulk-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.bulk-actions button:first-child {
+  background: #28a745;
+  color: white;
+}
+
+.bulk-actions button:first-child:hover {
+  background: #218838;
+}
+
+.submit-btn {
+  background: #667eea !important;
+  color: white;
+}
+
+.submit-btn:hover {
+  background: #5568d3 !important;
+}
+
+.delete-btn {
+  background: #dc3545;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.delete-btn:hover {
+  background: #c82333;
 }
 
 .clock-buttons {
@@ -157,6 +238,17 @@ table tbody tr:hover {
   background: #f5f5f5;
 }
 
+table tfoot {
+  font-weight: bold;
+  background: #f8f9fa;
+}
+
+.total-row td {
+  border-top: 2px solid #667eea;
+  padding-top: 15px;
+  font-size: 16px;
+}
+
 .result {
   margin-top: 20px;
   padding: 20px;
@@ -177,16 +269,29 @@ table tbody tr:hover {
     flex-direction: column;
   }
 
+  .tabs button {
+    width: 100%;
+  }
+
   .form {
     flex-direction: column;
   }
 
+  .shift-row {
+    flex-direction: column;
+  }
+
+  .shift-row select,
+  .shift-row input {
+    width: 100%;
+  }
+
   table {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   table th,
   table td {
-    padding: 8px;
+    padding: 8px 4px;
   }
 }
