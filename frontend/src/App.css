@@ -484,7 +484,19 @@ table tfoot {
 
 .location-info p {
   color: #666;
-  margin: 3px 0;
+  margin: 5px 0;
+  font-size: 14px;
+}
+
+.location-info .label {
+  font-weight: bold;
+  color: #667eea;
+  margin-right: 5px;
+}
+
+.location-industry,
+.location-address {
+  padding: 5px 0;
 }
 
 .location-type {

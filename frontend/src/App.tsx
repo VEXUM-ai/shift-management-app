@@ -87,7 +87,7 @@ function App() {
               className={activeTab === 'locations' ? 'active' : ''}
               onClick={() => setActiveTab('locations')}
             >
-              常駐先管理
+              クライアント先管理
             </button>
           </>
         )}
@@ -334,7 +334,8 @@ function LocationManagement() {
   const [locations, setLocations] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [name, setName] = useState('')
-  const [type, setType] = useState<'office' | 'client'>('client')
+  const [industry, setIndustry] = useState('')
+  const [address, setAddress] = useState('')
   const [selectedLocation, setSelectedLocation] = useState<any>(null)
   const [memberTransportFees, setMemberTransportFees] = useState<{[key: number]: string}>({})
   const [selectedMembers, setSelectedMembers] = useState<number[]>([])
@@ -365,14 +366,16 @@ function LocationManagement() {
 
   const addLocation = () => {
     if (!name) {
-      alert('勤務地名を入力してください')
+      alert('クライアント先名を入力してください')
       return
     }
 
     const newLocation = {
       id: Date.now(),
       name,
-      type,
+      industry: industry || '',
+      address: address || '',
+      type: 'client',
       member_transport_fees: {},
       created_at: new Date().toISOString()
     }
@@ -381,7 +384,9 @@ function LocationManagement() {
     saveLocations(updated)
 
     setName('')
-    alert('勤務地を追加しました')
+    setIndustry('')
+    setAddress('')
+    alert('クライアント先を追加しました')
   }
 
   const deleteLocation = (id: number) => {
@@ -437,54 +442,77 @@ function LocationManagement() {
 
   return (
     <div className="section">
-      <h2>🏢 常駐先・勤務地登録</h2>
+      <h2>🏢 クライアント先管理（管理者専用）</h2>
       <div className="guide-box">
         <h3>✨ 使い方（ステップバイステップ）</h3>
         <ol>
-          <li><strong>STEP 1:</strong> まず「メンバー管理」タブでメンバーを登録してください（オフィス交通費も設定）</li>
-          <li><strong>STEP 2:</strong> この画面で「オフィス」または「常駐先」を登録します</li>
-          <li><strong>STEP 3:</strong> 常駐先を登録後、「👥 メンバー設定」ボタンをクリック</li>
-          <li><strong>STEP 4:</strong> その常駐先に配属するメンバーを選択し、<strong>メンバーごとの交通費</strong>を設定</li>
+          <li><strong>STEP 1:</strong> まず「メンバー管理」タブでメンバーを登録（給与・オフィス交通費設定）</li>
+          <li><strong>STEP 2:</strong> この画面でクライアント先を登録（会社名・業界・場所）</li>
+          <li><strong>STEP 3:</strong> クライアント先登録後、「👥 メンバー設定」ボタンをクリック</li>
+          <li><strong>STEP 4:</strong> そのクライアント先に配属するメンバーを選択し、<strong>メンバーごとの交通費</strong>を設定</li>
         </ol>
         <p className="note">💡 メンバーによって交通費が異なる場合でも、個別に設定できます</p>
       </div>
 
       <div className="member-form">
-        <h3>🏢 新しい勤務地を追加</h3>
-        <p className="info-text">💡 給与設定はメンバー管理で行います。ここでは勤務地の登録とメンバー配属を行います。</p>
+        <h3>🏢 新しいクライアント先を追加</h3>
+        <p className="info-text">💡 給与設定はメンバー管理で行います。ここではクライアント先の情報とメンバー配属を行います。</p>
 
         <div className="form-row">
           <div className="form-group">
-            <label>種別 <span className="required">*必須</span></label>
-            <select value={type} onChange={(e) => setType(e.target.value as 'office' | 'client')}>
-              <option value="office">🏠 オフィス</option>
-              <option value="client">🏢 常駐先（クライアント先）</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>勤務地名 <span className="required">*必須</span></label>
+            <label>クライアント先名 <span className="required">*必須</span></label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={type === 'office' ? '例: 本社オフィス' : '例: A社、B社'}
+              placeholder="例: 株式会社A、B商事"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>業界 <span className="optional">任意</span></label>
+            <input
+              type="text"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="例: IT、製造、金融"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>場所・住所 <span className="optional">任意</span></label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="例: 東京都渋谷区、大阪府大阪市"
             />
           </div>
         </div>
 
         <div className="form-actions">
-          <button onClick={addLocation} className="submit-btn">➕ 勤務地を追加</button>
+          <button onClick={addLocation} className="submit-btn">➕ クライアント先を追加</button>
         </div>
       </div>
 
-      <h3>📋 登録済み勤務地一覧</h3>
+      <h3>📋 登録済みクライアント先一覧</h3>
       <div className="locations-grid">
         {locations.map((location) => (
           <div key={location.id} className="location-card">
             <div className="location-info">
-              <span className="location-type">{location.type === 'office' ? '🏠 オフィス' : '🏢 常駐先'}</span>
-              <h4>{location.name}</h4>
+              <h4>🏢 {location.name}</h4>
+              {location.industry && (
+                <p className="location-industry">
+                  <span className="label">業界:</span> {location.industry}
+                </p>
+              )}
+              {location.address && (
+                <p className="location-address">
+                  <span className="label">場所:</span> {location.address}
+                </p>
+              )}
               {Object.keys(location.member_transport_fees || {}).length > 0 && (
                 <span className="member-count">
                   👥 {Object.keys(location.member_transport_fees).length}人配属済み
@@ -504,7 +532,7 @@ function LocationManagement() {
         ))}
       </div>
       {locations.length === 0 && (
-        <p className="no-data">常駐先が登録されていません</p>
+        <p className="no-data">クライアント先が登録されていません</p>
       )}
 
       {/* メンバー設定モーダル */}
@@ -516,14 +544,12 @@ function LocationManagement() {
             <div className="modal-guide">
               <p><strong>💡 この画面でできること:</strong></p>
               <ol>
-                <li><strong>配属メンバーの選択</strong> - この{selectedLocation.type === 'office' ? 'オフィス' : '常駐先'}に所属するメンバーをチェック</li>
+                <li><strong>配属メンバーの選択</strong> - このクライアント先に配属するメンバーをチェック</li>
                 <li><strong>メンバーごとの交通費設定</strong> - 各メンバーの交通費を個別に入力（人によって金額が異なってもOK）</li>
                 <li><strong>保存して完了</strong> - 「保存」ボタンで設定を確定</li>
               </ol>
               <p className="note">
-                {selectedLocation.type === 'office'
-                  ? '📝 オフィス勤務の場合、メンバー管理で設定した「オフィス交通費」が優先されます'
-                  : '📝 常駐先の場合、ここで設定した交通費が給与計算に使用されます'}
+                📝 ここで設定した交通費が給与計算に使用されます
               </p>
             </div>
 
@@ -550,17 +576,12 @@ function LocationManagement() {
                         {member.email && <span className="member-email">({member.email})</span>}
                       </label>
                     </div>
-                    {selectedLocation.type === 'office' && (
-                      <div className="member-office-fee">
-                        オフィス交通費: ¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日
-                      </div>
-                    )}
                   </div>
 
                   {selectedMembers.includes(member.id) && (
                     <div className="fee-setting-row">
                       <label>
-                        {selectedLocation.type === 'office' ? 'このオフィスでの交通費' : 'この常駐先での交通費'}
+                        このクライアント先での交通費
                         <span className="required">*必須</span>
                       </label>
                       <div className="fee-input-group">
