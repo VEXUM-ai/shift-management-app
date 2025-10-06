@@ -1863,7 +1863,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
         )}
       </div>
 
-      {/* テーブルビュー */}
+      {/* カード形式のリストビュー */}
       <div className="shift-table-view">
         <div className="table-view-header">
           <h4>📋 リスト表示（日付順）</h4>
@@ -1881,11 +1881,24 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             {Object.keys(groupedByDate).sort().map((date) => {
               const dateShiftIds = groupedByDate[date].map((s: any) => s.id)
               const allSelected = dateShiftIds.every((id: number) => selectedShiftsForDelete.includes(id))
+              const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]
+              const dayClass = new Date(date).getDay() === 0 ? 'sunday' : new Date(date).getDay() === 6 ? 'saturday' : 'weekday'
+
+              // メンバーごとにグループ化
+              const memberGroups: { [key: string]: any[] } = {}
+              groupedByDate[date]
+                .filter((shift: any) => shift.location_id !== -1)
+                .forEach((shift: any) => {
+                  if (!memberGroups[shift.member_id]) {
+                    memberGroups[shift.member_id] = []
+                  }
+                  memberGroups[shift.member_id].push(shift)
+                })
 
               return (
-                <div key={date} className="date-group">
-                  <div className="date-group-header">
-                    <div className="date-info">
+                <div key={date} className="date-group-card">
+                  <div className={`date-group-header-card ${dayClass}`}>
+                    <div className="date-header-left">
                       <input
                         type="checkbox"
                         checked={allSelected}
@@ -1893,81 +1906,80 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
                         className="date-select-checkbox"
                         title="この日のシフトを全選択"
                       />
-                      <h5>📅 {date} ({['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]}曜日)</h5>
-                      <span className="date-shift-count">{groupedByDate[date].length}件のシフト</span>
+                      <div className="date-display">
+                        <span className="date-main">{date}</span>
+                        <span className={`day-label ${dayClass}`}>({dayOfWeek})</span>
+                      </div>
+                      <span className="shift-count-badge">{Object.keys(memberGroups).length}名</span>
                     </div>
-                    <button className="reregister-btn" onClick={() => reregisterFromDate(date)}>
-                      🔄 この日のシフトを再登録
+                    <button className="reregister-btn-compact" onClick={() => reregisterFromDate(date)}>
+                      🔄 再登録
                     </button>
                   </div>
-                  <div className="shifts-table-wrapper">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th width="40">選択</th>
-                          <th>メンバー</th>
-                          <th>勤務地</th>
-                          <th>オフィス出勤</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupedByDate[date]
-                          .filter((shift: any) => shift.location_id !== -1) // オフィス単独のシフトは表示しない
-                          .map((shift: any) => {
-                            // 同じ日付・メンバーでオフィスシフトがあるかチェック
-                            const hasOffice = shifts.some(
-                              s => s.date === shift.date &&
-                                   s.member_id === shift.member_id &&
-                                   s.location_id === -1
-                            )
 
-                            return (
-                              <tr key={shift.id} className={selectedShiftsForDelete.includes(shift.id) ? 'selected-for-delete' : ''}>
-                                <td>
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedShiftsForDelete.includes(shift.id)}
-                                    onChange={() => toggleShiftSelection(shift.id)}
-                                  />
-                                </td>
-                                <td><strong>{shift.member_name}</strong></td>
-                                <td>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span className={`location-badge ${
-                                      shift.is_other
-                                        ? 'location-other'
-                                        : shift.location_id === -2
-                                        ? 'location-advisor'
-                                        : `location-${shift.location_id % 10}`
-                                    }`}>
-                                      {shift.location_name}
-                                    </span>
-                                    {hasOffice && !shift.is_other && shift.location_id !== -2 && (
-                                      <span className="location-badge location-office" style={{ fontSize: '11px' }}>
-                                        🏢 オフィス
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td>
-                                  {shift.is_other || shift.location_id === -2 ? (
-                                    <span style={{ color: '#999' }}>-</span>
-                                  ) : hasOffice ? (
-                                    <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '18px' }}>🏢</span>
-                                  ) : (
-                                    <span style={{ color: '#ccc', fontSize: '18px' }}>-</span>
-                                  )}
-                                </td>
-                                <td>
-                                  <button className="edit-btn" onClick={() => openEditShiftInfo(shift)}>✏️ 編集</button>
-                                  <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                      </tbody>
-                    </table>
+                  <div className="member-shift-cards">
+                    {Object.entries(memberGroups).map(([memberId, memberShifts]: [string, any]) => {
+                      const mainShift = memberShifts[0]
+                      const hasOffice = shifts.some(
+                        s => s.date === date &&
+                             s.member_id === Number(memberId) &&
+                             s.location_id === -1
+                      )
+
+                      return (
+                        <div key={memberId} className="member-shift-card">
+                          <div className="member-card-header">
+                            <div className="member-info">
+                              <input
+                                type="checkbox"
+                                checked={memberShifts.every((s: any) => selectedShiftsForDelete.includes(s.id))}
+                                onChange={() => {
+                                  memberShifts.forEach((s: any) => toggleShiftSelection(s.id))
+                                }}
+                                className="member-checkbox"
+                              />
+                              <span className="member-name-large">👤 {mainShift.member_name}</span>
+                            </div>
+                          </div>
+
+                          <div className="shift-locations">
+                            {memberShifts.map((shift: any) => (
+                              <div key={shift.id} className="location-row">
+                                <span className={`location-badge-large ${
+                                  shift.is_other
+                                    ? 'location-other'
+                                    : shift.location_id === -2
+                                    ? 'location-advisor'
+                                    : `location-${shift.location_id % 10}`
+                                }`}>
+                                  {shift.is_other ? '📝' : shift.location_id === -2 ? '💼' : '🏢'} {shift.location_name}
+                                </span>
+                              </div>
+                            ))}
+                            {hasOffice && !mainShift.is_other && mainShift.location_id !== -2 && (
+                              <div className="location-row">
+                                <span className="location-badge-large location-office">
+                                  🏢 オフィス出勤
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="shift-card-actions">
+                            <button className="edit-btn-small" onClick={() => openEditShiftInfo(mainShift)}>
+                              ✏️ 編集
+                            </button>
+                            <button className="delete-btn-small" onClick={() => {
+                              if (confirm(`${mainShift.member_name}さんのこの日のシフトを削除しますか？`)) {
+                                memberShifts.forEach((s: any) => deleteShift(s.id))
+                              }
+                            }}>
+                              🗑️ 削除
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
