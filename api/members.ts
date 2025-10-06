@@ -4,7 +4,7 @@ let members: any[] = []
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') {
@@ -18,15 +18,34 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const { name, email } = req.body
+    const { name, email, transport_fees } = req.body
     const newMember = {
       id: Date.now(),
       name,
       email,
+      transport_fees: transport_fees || {},
       created_at: new Date().toISOString()
     }
     members.push(newMember)
     return res.json({ id: newMember.id, message: 'メンバーを追加しました' })
+  }
+
+  if (req.method === 'PUT') {
+    const { name, email, transport_fees } = req.body
+    const index = members.findIndex(m => m.id === Number(id))
+
+    if (index !== -1) {
+      members[index] = {
+        ...members[index],
+        name,
+        email,
+        transport_fees: transport_fees || {},
+        updated_at: new Date().toISOString()
+      }
+      return res.json({ message: 'メンバー情報を更新しました' })
+    }
+
+    return res.status(404).json({ error: 'メンバーが見つかりません' })
   }
 
   if (req.method === 'DELETE') {

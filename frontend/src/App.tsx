@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { LocationWithLogo, ShiftWithMonthlyView } from './components-enhanced'
+import { ShiftWithMonthlyView } from './components-enhanced'
+import { EnhancedMemberManagement } from './member-management'
+import { SimpleLocationManagement } from './location-simple'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
 
@@ -49,8 +51,8 @@ function App() {
       </nav>
 
       <main>
-        {activeTab === 'members' && <MemberManagement />}
-        {activeTab === 'locations' && <LocationWithLogo />}
+        {activeTab === 'members' && <EnhancedMemberManagement />}
+        {activeTab === 'locations' && <SimpleLocationManagement />}
         {activeTab === 'shift' && <ShiftWithMonthlyView />}
         {activeTab === 'attendance' && <AttendanceManagement />}
         {activeTab === 'salary' && <SalaryCalculation />}

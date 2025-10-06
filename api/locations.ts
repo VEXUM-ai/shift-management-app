@@ -18,12 +18,11 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const { name, hourly_wage, transportation_fee, type, logo } = req.body
+    const { name, hourly_wage, type, logo } = req.body
     const newLocation = {
       id: Date.now(),
       name,
       hourly_wage,
-      transportation_fee: transportation_fee || 0,
       type,
       logo: logo || '',
       created_at: new Date().toISOString()

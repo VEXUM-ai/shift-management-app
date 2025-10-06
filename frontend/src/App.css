@@ -446,3 +446,114 @@ table tfoot {
   overflow-x: auto;
   margin-top: 15px;
 }
+
+
+/* メンバー管理 */
+.member-form {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.transport-fees-section {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 2px solid #ddd;
+}
+
+.transport-fees-section h3 {
+  color: #667eea;
+  margin-bottom: 15px;
+}
+
+.transport-fees-section h4 {
+  color: #555;
+  margin: 15px 0 10px 0;
+  font-size: 14px;
+}
+
+.client-transport {
+  background: white;
+  padding: 12px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.edit-btn {
+  background: #ffc107;
+  color: #333;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.edit-btn:hover {
+  background: #e0a800;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
+}
+
+.members-table-wrapper {
+  overflow-x: auto;
+}
+
+.members-table-wrapper table {
+  min-width: 800px;
+}
+
+.info-text {
+  background: #e3f2fd;
+  padding: 10px 15px;
+  border-radius: 5px;
+  color: #1976d2;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
