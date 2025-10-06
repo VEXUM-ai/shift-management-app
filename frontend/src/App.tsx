@@ -431,17 +431,770 @@ function LocationManagement() {
   )
 }
 
-// 他の機能は既存のものを使用
+// シフト管理
 function ShiftManagement() {
-  return <div className="section"><h2>シフト管理</h2><p>準備中...</p></div>
+  const [shifts, setShifts] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [selectedMember, setSelectedMember] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState('')
+  const [date, setDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('')
+
+  useEffect(() => {
+    loadShifts()
+    loadMembers()
+    loadLocations()
+
+    // 今月をデフォルト設定
+    const now = new Date()
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(monthStr)
+  }, [])
+
+  const loadShifts = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+    if (stored) {
+      setShifts(JSON.parse(stored))
+    }
+  }
+
+  const loadMembers = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+    if (stored) {
+      setMembers(JSON.parse(stored))
+    }
+  }
+
+  const loadLocations = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+    if (stored) {
+      setLocations(JSON.parse(stored))
+    }
+  }
+
+  const saveShifts = (data: any[]) => {
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data))
+    setShifts(data)
+  }
+
+  const addShift = () => {
+    if (!selectedMember || !selectedLocation || !date || !startTime || !endTime) {
+      alert('すべての項目を入力してください')
+      return
+    }
+
+    const member = members.find(m => m.id === Number(selectedMember))
+    const location = locations.find(l => l.id === Number(selectedLocation))
+
+    const newShift = {
+      id: Date.now(),
+      member_id: member.id,
+      member_name: member.name,
+      location_id: location.id,
+      location_name: location.name,
+      date,
+      start_time: startTime,
+      end_time: endTime,
+      status: '提出済み',
+      created_at: new Date().toISOString()
+    }
+
+    const updated = [...shifts, newShift]
+    saveShifts(updated)
+
+    setSelectedMember('')
+    setSelectedLocation('')
+    setDate('')
+    setStartTime('')
+    setEndTime('')
+    alert('シフトを登録しました')
+  }
+
+  const deleteShift = (id: number) => {
+    if (!confirm('このシフトを削除しますか？')) return
+    const updated = shifts.filter(s => s.id !== id)
+    saveShifts(updated)
+  }
+
+  const exportCSV = () => {
+    const filtered = shifts.filter(s => s.date.startsWith(selectedMonth))
+
+    if (filtered.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['メンバー', '勤務地', '日付', '開始時間', '終了時間', 'ステータス']
+    const rows = filtered.map(s => [
+      s.member_name,
+      s.location_name,
+      s.date,
+      s.start_time,
+      s.end_time,
+      s.status
+    ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `shifts_${selectedMonth}.csv`
+    link.click()
+  }
+
+  const filteredShifts = selectedMonth
+    ? shifts.filter(s => s.date.startsWith(selectedMonth))
+    : shifts
+
+  return (
+    <div className="section">
+      <h2>📅 シフト管理</h2>
+      <div className="guide-box">
+        <h3>使い方</h3>
+        <ol>
+          <li>メンバーと勤務地を選択してください</li>
+          <li>シフトの日付と時間を入力してください</li>
+          <li>「シフト追加」ボタンをクリックして登録</li>
+          <li>月を選択してシフトを絞り込み、CSV出力できます</li>
+        </ol>
+      </div>
+
+      <div className="shift-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label>メンバー <span className="required">*必須</span></label>
+            <select
+              value={selectedMember}
+              onChange={(e) => setSelectedMember(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>勤務地 <span className="required">*必須</span></label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {locations.map(l => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>日付 <span className="required">*必須</span></label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>開始時間 <span className="required">*必須</span></label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>終了時間 <span className="required">*必須</span></label>
+            <input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button onClick={addShift} className="submit-btn">➕ シフト追加</button>
+        </div>
+      </div>
+
+      <div className="filter-section">
+        <h3>📊 シフト一覧</h3>
+        <div className="filter-bar">
+          <div className="form-group">
+            <label>月で絞り込み</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+        </div>
+      </div>
+
+      <div className="shifts-table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>メンバー</th>
+              <th>勤務地</th>
+              <th>日付</th>
+              <th>開始時間</th>
+              <th>終了時間</th>
+              <th>ステータス</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredShifts.map((shift) => (
+              <tr key={shift.id}>
+                <td><strong>{shift.member_name}</strong></td>
+                <td>{shift.location_name}</td>
+                <td>{shift.date}</td>
+                <td>{shift.start_time}</td>
+                <td>{shift.end_time}</td>
+                <td><span className="status-badge">{shift.status}</span></td>
+                <td>
+                  <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredShifts.length === 0 && (
+          <p className="no-data">シフトが登録されていません</p>
+        )}
+      </div>
+    </div>
+  )
 }
 
+// 勤怠管理
 function AttendanceManagement() {
-  return <div className="section"><h2>勤怠管理</h2><p>準備中...</p></div>
+  const [attendance, setAttendance] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [selectedMember, setSelectedMember] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState('')
+  const [clockedIn, setClockedIn] = useState(false)
+  const [currentEntry, setCurrentEntry] = useState<any>(null)
+  const [selectedMonth, setSelectedMonth] = useState('')
+
+  useEffect(() => {
+    loadAttendance()
+    loadMembers()
+    loadLocations()
+
+    const now = new Date()
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(monthStr)
+  }, [])
+
+  const loadAttendance = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+    if (stored) {
+      setAttendance(JSON.parse(stored))
+    }
+  }
+
+  const loadMembers = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+    if (stored) {
+      setMembers(JSON.parse(stored))
+    }
+  }
+
+  const loadLocations = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+    if (stored) {
+      setLocations(JSON.parse(stored))
+    }
+  }
+
+  const saveAttendance = (data: any[]) => {
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data))
+    setAttendance(data)
+  }
+
+  const clockIn = () => {
+    if (!selectedMember || !selectedLocation) {
+      alert('メンバーと勤務地を選択してください')
+      return
+    }
+
+    const member = members.find(m => m.id === Number(selectedMember))
+    const location = locations.find(l => l.id === Number(selectedLocation))
+    const now = new Date()
+
+    const newEntry = {
+      id: Date.now(),
+      member_id: member.id,
+      member_name: member.name,
+      location_id: location.id,
+      location_name: location.name,
+      date: now.toISOString().split('T')[0],
+      clock_in: now.toTimeString().slice(0, 5),
+      clock_out: null,
+      total_hours: null,
+      created_at: now.toISOString()
+    }
+
+    const updated = [...attendance, newEntry]
+    saveAttendance(updated)
+
+    setCurrentEntry(newEntry)
+    setClockedIn(true)
+    alert(`${member.name}さんが${location.name}に出勤しました`)
+  }
+
+  const clockOut = () => {
+    if (!currentEntry) return
+
+    const now = new Date()
+    const clockOutTime = now.toTimeString().slice(0, 5)
+
+    const clockInDate = new Date(`2000-01-01 ${currentEntry.clock_in}`)
+    const clockOutDate = new Date(`2000-01-01 ${clockOutTime}`)
+    const totalHours = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60)
+
+    const updated = attendance.map(a =>
+      a.id === currentEntry.id
+        ? { ...a, clock_out: clockOutTime, total_hours: totalHours }
+        : a
+    )
+
+    saveAttendance(updated)
+    setClockedIn(false)
+    setCurrentEntry(null)
+    setSelectedMember('')
+    setSelectedLocation('')
+    alert(`退勤しました（勤務時間: ${totalHours.toFixed(2)}時間）`)
+  }
+
+  const deleteAttendance = (id: number) => {
+    if (!confirm('この勤怠記録を削除しますか？')) return
+    const updated = attendance.filter(a => a.id !== id)
+    saveAttendance(updated)
+  }
+
+  const exportCSV = () => {
+    const filtered = attendance.filter(a => a.date.startsWith(selectedMonth))
+
+    if (filtered.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['メンバー', '勤務地', '日付', '出勤時刻', '退勤時刻', '勤務時間']
+    const rows = filtered.map(a => [
+      a.member_name,
+      a.location_name,
+      a.date,
+      a.clock_in,
+      a.clock_out || '-',
+      a.total_hours ? `${a.total_hours.toFixed(2)}時間` : '-'
+    ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `attendance_${selectedMonth}.csv`
+    link.click()
+  }
+
+  const filteredAttendance = selectedMonth
+    ? attendance.filter(a => a.date.startsWith(selectedMonth))
+    : attendance
+
+  return (
+    <div className="section">
+      <h2>⏰ 勤怠管理</h2>
+      <div className="guide-box">
+        <h3>使い方</h3>
+        <ol>
+          <li>メンバーと勤務地を選択してください</li>
+          <li>「出勤」ボタンをクリックして出勤時刻を記録</li>
+          <li>作業終了時に「退勤」ボタンをクリック</li>
+          <li>勤務時間が自動計算されます</li>
+        </ol>
+      </div>
+
+      <div className="attendance-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label>メンバー</label>
+            <select
+              value={selectedMember}
+              onChange={(e) => setSelectedMember(e.target.value)}
+              disabled={clockedIn}
+            >
+              <option value="">選択してください</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>勤務地</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              disabled={clockedIn}
+            >
+              <option value="">選択してください</option>
+              {locations.map(l => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="clock-buttons">
+          <button onClick={clockIn} disabled={clockedIn} className="clock-in-btn">
+            🟢 出勤
+          </button>
+          <button onClick={clockOut} disabled={!clockedIn} className="clock-out-btn">
+            🔴 退勤
+          </button>
+        </div>
+
+        {clockedIn && currentEntry && (
+          <div className="current-status">
+            <p>
+              <strong>出勤中:</strong> {currentEntry.member_name} - {currentEntry.location_name}
+              <br />
+              <strong>出勤時刻:</strong> {currentEntry.clock_in}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="filter-section">
+        <h3>📊 勤怠記録</h3>
+        <div className="filter-bar">
+          <div className="form-group">
+            <label>月で絞り込み</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+        </div>
+      </div>
+
+      <div className="attendance-table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>メンバー</th>
+              <th>勤務地</th>
+              <th>日付</th>
+              <th>出勤時刻</th>
+              <th>退勤時刻</th>
+              <th>勤務時間</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAttendance.map((record) => (
+              <tr key={record.id}>
+                <td><strong>{record.member_name}</strong></td>
+                <td>{record.location_name}</td>
+                <td>{record.date}</td>
+                <td>{record.clock_in}</td>
+                <td>{record.clock_out || <span className="pending">勤務中</span>}</td>
+                <td>{record.total_hours ? `${record.total_hours.toFixed(2)}時間` : '-'}</td>
+                <td>
+                  <button className="delete-btn" onClick={() => deleteAttendance(record.id)}>削除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredAttendance.length === 0 && (
+          <p className="no-data">勤怠記録がありません</p>
+        )}
+      </div>
+    </div>
+  )
 }
 
+// 給与計算
 function SalaryCalculation() {
-  return <div className="section"><h2>給与計算</h2><p>準備中...</p></div>
+  const [members, setMembers] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [attendance, setAttendance] = useState<any[]>([])
+  const [selectedMember, setSelectedMember] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [salaryData, setSalaryData] = useState<any>(null)
+
+  useEffect(() => {
+    loadMembers()
+    loadLocations()
+    loadAttendance()
+
+    const now = new Date()
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(monthStr)
+  }, [])
+
+  const loadMembers = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+    if (stored) {
+      setMembers(JSON.parse(stored))
+    }
+  }
+
+  const loadLocations = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+    if (stored) {
+      setLocations(JSON.parse(stored))
+    }
+  }
+
+  const loadAttendance = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+    if (stored) {
+      setAttendance(JSON.parse(stored))
+    }
+  }
+
+  const calculateSalary = () => {
+    if (!selectedMember || !selectedMonth) {
+      alert('メンバーと月を選択してください')
+      return
+    }
+
+    const member = members.find(m => m.id === Number(selectedMember))
+    const records = attendance.filter(a =>
+      a.member_id === Number(selectedMember) &&
+      a.date.startsWith(selectedMonth) &&
+      a.total_hours
+    )
+
+    if (records.length === 0) {
+      alert('該当する勤怠記録がありません')
+      return
+    }
+
+    const breakdown: any = {}
+    let totalHours = 0
+    let totalSalary = 0
+    let totalTransportFee = 0
+
+    records.forEach(record => {
+      const location = locations.find(l => l.id === record.location_id)
+      const locationName = record.location_name
+      const hourlyWage = location?.hourly_wage || 0
+      const hours = record.total_hours
+      const salary = hours * hourlyWage
+
+      // 交通費計算
+      let transportFee = 0
+      if (location?.type === 'office') {
+        transportFee = member.office_transport_fee || 0
+      } else if (location?.type === 'client') {
+        transportFee = location.member_transport_fees?.[member.id] || 0
+      }
+
+      if (!breakdown[locationName]) {
+        breakdown[locationName] = {
+          days: 0,
+          hours: 0,
+          hourlyWage,
+          salary: 0,
+          transportFee: 0,
+          total: 0
+        }
+      }
+
+      breakdown[locationName].days += 1
+      breakdown[locationName].hours += hours
+      breakdown[locationName].salary += salary
+      breakdown[locationName].transportFee += transportFee
+      breakdown[locationName].total += salary + transportFee
+
+      totalHours += hours
+      totalSalary += salary
+      totalTransportFee += transportFee
+    })
+
+    setSalaryData({
+      member: member.name,
+      month: selectedMonth,
+      breakdown,
+      totalDays: records.length,
+      totalHours,
+      totalSalary,
+      totalTransportFee,
+      grandTotal: totalSalary + totalTransportFee
+    })
+  }
+
+  const exportPDF = () => {
+    if (!salaryData) {
+      alert('先に給与計算を実行してください')
+      return
+    }
+
+    alert('PDF出力機能は準備中です。現在はCSV出力をご利用ください。')
+  }
+
+  const exportCSV = () => {
+    if (!salaryData) {
+      alert('先に給与計算を実行してください')
+      return
+    }
+
+    const header = ['勤務地', '出勤日数', '勤務時間', '時給', '給与', '交通費', '合計']
+    const rows = Object.entries(salaryData.breakdown).map(([location, data]: [string, any]) => [
+      location,
+      `${data.days}日`,
+      `${data.hours.toFixed(2)}時間`,
+      `¥${data.hourlyWage.toLocaleString()}`,
+      `¥${data.salary.toLocaleString()}`,
+      `¥${data.transportFee.toLocaleString()}`,
+      `¥${data.total.toLocaleString()}`
+    ])
+
+    const summary = [
+      '',
+      `合計: ${salaryData.totalDays}日`,
+      `${salaryData.totalHours.toFixed(2)}時間`,
+      '',
+      `¥${salaryData.totalSalary.toLocaleString()}`,
+      `¥${salaryData.totalTransportFee.toLocaleString()}`,
+      `¥${salaryData.grandTotal.toLocaleString()}`
+    ]
+
+    const csv = [header, ...rows, summary].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `salary_${salaryData.member}_${salaryData.month}.csv`
+    link.click()
+  }
+
+  return (
+    <div className="section">
+      <h2>💰 給与計算</h2>
+      <div className="guide-box">
+        <h3>使い方</h3>
+        <ol>
+          <li>給与計算したいメンバーを選択してください</li>
+          <li>対象月を選択してください</li>
+          <li>「計算実行」ボタンをクリック</li>
+          <li>勤務地別の給与・交通費が表示されます</li>
+          <li>CSV出力で給与明細をダウンロードできます</li>
+        </ol>
+      </div>
+
+      <div className="salary-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label>メンバー <span className="required">*必須</span></label>
+            <select
+              value={selectedMember}
+              onChange={(e) => setSelectedMember(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>対象月 <span className="required">*必須</span></label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button onClick={calculateSalary} className="submit-btn">🧮 計算実行</button>
+        </div>
+      </div>
+
+      {salaryData && (
+        <div className="salary-result">
+          <div className="result-header">
+            <h3>📋 給与明細</h3>
+            <div className="export-buttons">
+              <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+            </div>
+          </div>
+
+          <div className="result-summary">
+            <p><strong>対象:</strong> {salaryData.member}</p>
+            <p><strong>対象月:</strong> {salaryData.month}</p>
+          </div>
+
+          <table className="salary-table">
+            <thead>
+              <tr>
+                <th>勤務地</th>
+                <th>出勤日数</th>
+                <th>勤務時間</th>
+                <th>時給</th>
+                <th>給与</th>
+                <th>交通費</th>
+                <th>合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(salaryData.breakdown).map(([location, data]: [string, any]) => (
+                <tr key={location}>
+                  <td><strong>{location}</strong></td>
+                  <td>{data.days}日</td>
+                  <td>{data.hours.toFixed(2)}時間</td>
+                  <td>¥{data.hourlyWage.toLocaleString()}</td>
+                  <td>¥{data.salary.toLocaleString()}</td>
+                  <td>¥{data.transportFee.toLocaleString()}</td>
+                  <td><strong>¥{data.total.toLocaleString()}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="total-row">
+                <td><strong>合計</strong></td>
+                <td><strong>{salaryData.totalDays}日</strong></td>
+                <td><strong>{salaryData.totalHours.toFixed(2)}時間</strong></td>
+                <td>-</td>
+                <td><strong>¥{salaryData.totalSalary.toLocaleString()}</strong></td>
+                <td><strong>¥{salaryData.totalTransportFee.toLocaleString()}</strong></td>
+                <td className="grand-total"><strong>¥{salaryData.grandTotal.toLocaleString()}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {!salaryData && (
+        <div className="no-data">
+          <p>メンバーと月を選択して「計算実行」をクリックしてください</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default App

@@ -652,6 +652,231 @@ table tfoot {
   font-size: 14px;
 }
 
+/* シフト管理・勤怠管理・給与計算 共通 */
+.shift-form,
+.attendance-form,
+.salary-form {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+.form-row select,
+.form-row input[type="date"],
+.form-row input[type="time"],
+.form-row input[type="month"] {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+.form-row select:focus,
+.form-row input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 勤怠管理 - 出退勤ボタン */
+.clock-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.clock-in-btn,
+.clock-out-btn {
+  flex: 1;
+  padding: 15px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.clock-in-btn {
+  background: #28a745;
+  color: white;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.clock-in-btn:hover:not(:disabled) {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.4);
+}
+
+.clock-out-btn {
+  background: #dc3545;
+  color: white;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.clock-out-btn:hover:not(:disabled) {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+}
+
+.clock-in-btn:disabled,
+.clock-out-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.current-status {
+  margin-top: 20px;
+  padding: 15px;
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  border-radius: 5px;
+}
+
+.current-status p {
+  margin: 0;
+  color: #155724;
+  line-height: 1.8;
+}
+
+.pending {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+/* フィルター */
+.filter-section {
+  margin: 30px 0 20px 0;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-bar .form-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.export-btn {
+  padding: 12px 24px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+.export-btn:hover {
+  background: #138496;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.4);
+}
+
+/* 給与計算結果 */
+.salary-result {
+  margin-top: 30px;
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.result-header h3 {
+  margin: 0;
+  color: #667eea;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.result-summary {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.result-summary p {
+  margin: 5px 0;
+  color: #555;
+}
+
+.salary-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.salary-table th,
+.salary-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.salary-table th {
+  background: #667eea;
+  color: white;
+  font-weight: bold;
+}
+
+.salary-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.salary-table tfoot .total-row {
+  background: #e3f2fd;
+  font-weight: bold;
+}
+
+.salary-table .grand-total {
+  background: #667eea;
+  color: white;
+  font-size: 18px;
+}
+
+.attendance-table-wrapper {
+  overflow-x: auto;
+  margin-top: 15px;
+}
+
 
 /* モーダル */
 .modal-overlay {
