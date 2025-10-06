@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-
-let locations: any[] = []
+import { getLocations, setLocations } from './_storage'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -14,11 +13,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const { id } = req.query
 
   if (req.method === 'GET') {
+    const locations = getLocations()
     return res.json(locations)
   }
 
   if (req.method === 'POST') {
     const { name, hourly_wage, type, logo, member_transport_fees } = req.body
+    const locations = getLocations()
     const newLocation = {
       id: Date.now(),
       name,
@@ -29,11 +30,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       created_at: new Date().toISOString()
     }
     locations.push(newLocation)
+    setLocations(locations)
     return res.json({ id: newLocation.id, message: '常駐先を追加しました' })
   }
 
   if (req.method === 'PUT') {
     const { member_transport_fees } = req.body
+    const locations = getLocations()
     const index = locations.findIndex(l => l.id === Number(id))
 
     if (index !== -1) {
@@ -42,6 +45,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         member_transport_fees: member_transport_fees || locations[index].member_transport_fees,
         updated_at: new Date().toISOString()
       }
+      setLocations(locations)
       return res.json({ message: '常駐先情報を更新しました' })
     }
 
@@ -49,7 +53,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE') {
-    locations = locations.filter(l => l.id !== Number(id))
+    const locations = getLocations()
+    const filtered = locations.filter(l => l.id !== Number(id))
+    setLocations(filtered)
     return res.json({ message: '常駐先を削除しました' })
   }
 

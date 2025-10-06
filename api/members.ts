@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-
-let members: any[] = []
+import { getMembers, setMembers } from './_storage'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -14,11 +13,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const { id } = req.query
 
   if (req.method === 'GET') {
+    const members = getMembers()
     return res.json(members)
   }
 
   if (req.method === 'POST') {
     const { name, email, office_transport_fee } = req.body
+    const members = getMembers()
     const newMember = {
       id: Date.now(),
       name,
@@ -27,11 +28,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       created_at: new Date().toISOString()
     }
     members.push(newMember)
+    setMembers(members)
     return res.json({ id: newMember.id, message: 'メンバーを追加しました' })
   }
 
   if (req.method === 'PUT') {
     const { name, email, office_transport_fee } = req.body
+    const members = getMembers()
     const index = members.findIndex(m => m.id === Number(id))
 
     if (index !== -1) {
@@ -42,6 +45,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         office_transport_fee: office_transport_fee || 0,
         updated_at: new Date().toISOString()
       }
+      setMembers(members)
       return res.json({ message: 'メンバー情報を更新しました' })
     }
 
@@ -49,7 +53,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE') {
-    members = members.filter(m => m.id !== Number(id))
+    const members = getMembers()
+    const filtered = members.filter(m => m.id !== Number(id))
+    setMembers(filtered)
     return res.json({ message: 'メンバーを削除しました' })
   }
 

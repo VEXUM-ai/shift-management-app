@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-
-let attendance: any[] = []
+import { getAttendance, setAttendance } from './_storage'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -14,20 +13,24 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const { action, id } = req.query
 
   if (req.method === 'GET') {
+    const attendance = getAttendance()
     return res.json(attendance)
   }
 
   if (req.method === 'POST' && action === 'clock-in') {
+    const attendance = getAttendance()
     const newRecord = {
       id: Date.now(),
       ...req.body,
       created_at: new Date().toISOString()
     }
     attendance.push(newRecord)
+    setAttendance(attendance)
     return res.json({ id: newRecord.id, message: '出勤を記録しました' })
   }
 
   if (req.method === 'PUT' && action === 'clock-out') {
+    const attendance = getAttendance()
     const index = attendance.findIndex(a => a.id === Number(id))
     if (index !== -1) {
       const clockIn = new Date(`2000-01-01 ${attendance[index].clock_in}`)
@@ -39,13 +42,16 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         clock_out: req.body.clock_out,
         total_hours: totalHours
       }
+      setAttendance(attendance)
       return res.json({ message: '退勤を記録しました', total_hours: totalHours })
     }
     return res.status(404).json({ error: '出勤記録が見つかりません' })
   }
 
   if (req.method === 'DELETE') {
-    attendance = attendance.filter(a => a.id !== Number(id))
+    const attendance = getAttendance()
+    const filtered = attendance.filter(a => a.id !== Number(id))
+    setAttendance(filtered)
     return res.json({ message: '勤怠記録を削除しました' })
   }
 
