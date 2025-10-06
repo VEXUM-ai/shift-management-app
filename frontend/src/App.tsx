@@ -621,8 +621,11 @@ function ShiftManagement() {
   const [shifts, setShifts] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
+  const [attendance, setAttendance] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
+  const [otherActivity, setOtherActivity] = useState('')
+  const [isOtherSelected, setIsOtherSelected] = useState(false)
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [editingShift, setEditingShift] = useState<any>(null)
@@ -635,6 +638,7 @@ function ShiftManagement() {
     loadShifts()
     loadMembers()
     loadLocations()
+    loadAttendance()
 
     // 今月をデフォルト設定
     const now = new Date()
@@ -642,6 +646,13 @@ function ShiftManagement() {
     setSelectedMonth(monthStr)
     setCalendarMonth(monthStr)
   }, [])
+
+  const loadAttendance = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+    if (stored) {
+      setAttendance(JSON.parse(stored))
+    }
+  }
 
   // カレンダーの日付を生成
   const generateCalendarDates = () => {
@@ -757,8 +768,18 @@ function ShiftManagement() {
   }
 
   const addBulkShifts = () => {
-    if (!selectedMember || !selectedLocation) {
-      alert('メンバーと勤務地を選択してください')
+    if (!selectedMember) {
+      alert('メンバーを選択してください')
+      return
+    }
+
+    if (!isOtherSelected && !selectedLocation) {
+      alert('勤務地を選択するか、「その他」を選択してください')
+      return
+    }
+
+    if (isOtherSelected && !otherActivity) {
+      alert('その他の活動内容を入力してください')
       return
     }
 
@@ -768,14 +789,32 @@ function ShiftManagement() {
     }
 
     const member = members.find(m => m.id === Number(selectedMember))
-    const location = locations.find(l => l.id === Number(selectedLocation))
+
+    let locationData = {
+      id: null,
+      name: ''
+    }
+
+    if (isOtherSelected) {
+      locationData = {
+        id: 0,
+        name: `その他: ${otherActivity}`
+      }
+    } else {
+      const location = locations.find(l => l.id === Number(selectedLocation))
+      locationData = {
+        id: location.id,
+        name: location.name
+      }
+    }
 
     const newShifts = selectedDates.map((date, index) => ({
       id: Date.now() + index,
       member_id: member.id,
       member_name: member.name,
-      location_id: location.id,
-      location_name: location.name,
+      location_id: locationData.id,
+      location_name: locationData.name,
+      is_other: isOtherSelected,
       date,
       start_time: null,
       end_time: null,
@@ -788,6 +827,8 @@ function ShiftManagement() {
 
     setSelectedMember('')
     setSelectedLocation('')
+    setOtherActivity('')
+    setIsOtherSelected(false)
     setSelectedDates([])
     alert(`${selectedDates.length}件のシフトを登録しました`)
   }
@@ -852,9 +893,38 @@ function ShiftManagement() {
     link.click()
   }
 
+  // 勤怠データをシフトに反映
+  const getShiftWithAttendance = (shift: any) => {
+    const attendanceRecord = attendance.find(
+      a => a.member_id === shift.member_id && a.date === shift.date
+    )
+
+    if (attendanceRecord && attendanceRecord.clock_in && attendanceRecord.clock_out) {
+      return {
+        ...shift,
+        start_time: attendanceRecord.clock_in,
+        end_time: attendanceRecord.clock_out,
+        from_attendance: true
+      }
+    }
+
+    return shift
+  }
+
   const filteredShifts = selectedMonth
-    ? shifts.filter(s => s.date.startsWith(selectedMonth)).sort((a, b) => a.date.localeCompare(b.date))
-    : shifts.sort((a, b) => a.date.localeCompare(b.date))
+    ? shifts.filter(s => s.date.startsWith(selectedMonth))
+        .map(getShiftWithAttendance)
+        .sort((a, b) => a.date.localeCompare(b.date))
+    : shifts.map(getShiftWithAttendance).sort((a, b) => a.date.localeCompare(b.date))
+
+  // 日付ごとにグループ化
+  const groupedByDate = filteredShifts.reduce((acc: any, shift: any) => {
+    if (!acc[shift.date]) {
+      acc[shift.date] = []
+    }
+    acc[shift.date].push(shift)
+    return acc
+  }, {})
 
   const calendarDates = generateCalendarDates()
 
@@ -924,20 +994,57 @@ function ShiftManagement() {
               ))}
             </select>
           </div>
+        </div>
 
+        <div className="form-row">
           <div className="form-group">
-            <label>勤務地 <span className="required">*必須</span></label>
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-            >
-              <option value="">選択してください</option>
-              {locations.map(l => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
+            <label>
+              <input
+                type="checkbox"
+                checked={isOtherSelected}
+                onChange={(e) => {
+                  setIsOtherSelected(e.target.checked)
+                  if (e.target.checked) {
+                    setSelectedLocation('')
+                  } else {
+                    setOtherActivity('')
+                  }
+                }}
+                style={{ width: 'auto', marginRight: '8px' }}
+              />
+              その他の活動（研修・営業・休暇など）
+            </label>
           </div>
         </div>
+
+        {!isOtherSelected ? (
+          <div className="form-row">
+            <div className="form-group">
+              <label>クライアント先 <span className="required">*必須</span></label>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
+                <option value="">選択してください</option>
+                {locations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="form-row">
+            <div className="form-group">
+              <label>活動内容 <span className="required">*必須</span></label>
+              <input
+                type="text"
+                value={otherActivity}
+                onChange={(e) => setOtherActivity(e.target.value)}
+                placeholder="例: 新人研修、営業活動、有給休暇"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="calendar-container">
@@ -1019,7 +1126,7 @@ function ShiftManagement() {
         <div className="bulk-submit-section">
           <button
             onClick={addBulkShifts}
-            disabled={!selectedMember || !selectedLocation || selectedDates.length === 0}
+            disabled={!selectedMember || (!isOtherSelected && !selectedLocation) || (isOtherSelected && !otherActivity) || selectedDates.length === 0}
           >
             ➕ {selectedDates.length > 0 ? `${selectedDates.length}日分` : ''}シフトを一括登録
           </button>
@@ -1071,17 +1178,29 @@ function ShiftManagement() {
                   {hasShifts && <span className="shift-count-badge">{cell.shifts.length}</span>}
                 </div>
                 <div className="cell-shifts">
-                  {cell.shifts.map((shift: any) => (
-                    <div key={shift.id} className="mini-shift-card" onClick={() => openEditTime(shift)}>
-                      <div className="mini-shift-member">{shift.member_name}</div>
-                      <div className="mini-shift-location">{shift.location_name}</div>
-                      {shift.start_time && shift.end_time && (
-                        <div className="mini-shift-time">
-                          {shift.start_time}-{shift.end_time}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {cell.shifts.map((shift: any) => {
+                    // クライアント先ごとに色を決定
+                    const colorClass = shift.is_other
+                      ? 'shift-other'
+                      : `shift-location-${shift.location_id % 10}`
+
+                    return (
+                      <div
+                        key={shift.id}
+                        className={`mini-shift-card ${colorClass}`}
+                        onClick={() => openEditTime(shift)}
+                      >
+                        <div className="mini-shift-member">{shift.member_name}</div>
+                        <div className="mini-shift-location">{shift.location_name}</div>
+                        {shift.start_time && shift.end_time && (
+                          <div className="mini-shift-time">
+                            {shift.start_time}-{shift.end_time}
+                            {shift.from_attendance && <span className="attendance-badge">📊</span>}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -1095,40 +1214,59 @@ function ShiftManagement() {
       {/* テーブルビュー */}
       <div className="shift-table-view">
         <h4>📋 リスト表示（日付順）</h4>
-        <div className="shifts-table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>日付</th>
-                <th>メンバー</th>
-                <th>勤務地</th>
-                <th>開始時間</th>
-                <th>終了時間</th>
-                <th>ステータス</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredShifts.map((shift) => (
-                <tr key={shift.id}>
-                  <td><strong>{shift.date}</strong></td>
-                  <td>{shift.member_name}</td>
-                  <td>{shift.location_name}</td>
-                  <td>{shift.start_time || <span className="pending">未設定</span>}</td>
-                  <td>{shift.end_time || <span className="pending">未設定</span>}</td>
-                  <td><span className="status-badge">{shift.status}</span></td>
-                  <td>
-                    <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
-                    <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredShifts.length === 0 && (
-            <p className="no-data">シフトが登録されていません</p>
-          )}
-        </div>
+        {Object.keys(groupedByDate).length === 0 ? (
+          <p className="no-data">シフトが登録されていません</p>
+        ) : (
+          <div className="date-grouped-shifts">
+            {Object.keys(groupedByDate).sort().map((date) => (
+              <div key={date} className="date-group">
+                <div className="date-group-header">
+                  <h5>📅 {date} ({['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]}曜日)</h5>
+                  <span className="date-shift-count">{groupedByDate[date].length}件のシフト</span>
+                </div>
+                <div className="shifts-table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>メンバー</th>
+                        <th>勤務地</th>
+                        <th>開始時間</th>
+                        <th>終了時間</th>
+                        <th>ステータス</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedByDate[date].map((shift: any) => (
+                        <tr key={shift.id}>
+                          <td><strong>{shift.member_name}</strong></td>
+                          <td>
+                            <span className={`location-badge ${shift.is_other ? 'location-other' : `location-${shift.location_id % 10}`}`}>
+                              {shift.location_name}
+                            </span>
+                          </td>
+                          <td>
+                            {shift.start_time || <span className="pending">未設定</span>}
+                            {shift.from_attendance && <span className="attendance-badge" title="勤怠データから反映">📊</span>}
+                          </td>
+                          <td>
+                            {shift.end_time || <span className="pending">未設定</span>}
+                            {shift.from_attendance && <span className="attendance-badge" title="勤怠データから反映">📊</span>}
+                          </td>
+                          <td><span className="status-badge">{shift.status}</span></td>
+                          <td>
+                            <button className="edit-btn" onClick={() => openEditTime(shift)}>⏱ 時間設定</button>
+                            <button className="delete-btn" onClick={() => deleteShift(shift.id)}>削除</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 時間設定モーダル */}
