@@ -313,34 +313,53 @@ function LocationManagement() {
     <div className="section">
       <h2>🏢 常駐先・勤務地登録</h2>
       <div className="guide-box">
-        <h3>使い方</h3>
+        <h3>✨ 使い方（ステップバイステップ）</h3>
         <ol>
-          <li>「オフィス」または「常駐先」を選択してください</li>
-          <li>勤務地の名前を入力してください</li>
-          <li>時給を入力してください</li>
-          <li>「追加」ボタンをクリックして登録</li>
-          <li>常駐先の場合、「メンバー登録・交通費設定」ボタンで所属メンバーと交通費を設定できます</li>
+          <li><strong>STEP 1:</strong> まず「メンバー管理」タブでメンバーを登録してください（オフィス交通費も設定）</li>
+          <li><strong>STEP 2:</strong> この画面で「オフィス」または「常駐先」を登録します</li>
+          <li><strong>STEP 3:</strong> 常駐先を登録後、「👥 メンバー設定」ボタンをクリック</li>
+          <li><strong>STEP 4:</strong> その常駐先に配属するメンバーを選択し、<strong>メンバーごとの交通費</strong>を設定</li>
         </ol>
+        <p className="note">💡 メンバーによって交通費が異なる場合でも、個別に設定できます</p>
       </div>
 
-      <div className="form">
-        <select value={type} onChange={(e) => setType(e.target.value as 'office' | 'client')}>
-          <option value="office">🏠 オフィス</option>
-          <option value="client">🏢 常駐先</option>
-        </select>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={type === 'office' ? '例: 本社オフィス' : '例: A社、B社'}
-        />
-        <input
-          type="number"
-          value={hourlyWage}
-          onChange={(e) => setHourlyWage(e.target.value)}
-          placeholder="例: 1500"
-        />
-        <button onClick={addLocation}>➕ 追加</button>
+      <div className="member-form">
+        <h3>🏢 新しい勤務地を追加</h3>
+        <div className="form-row">
+          <div className="form-group">
+            <label>種別 <span className="required">*必須</span></label>
+            <select value={type} onChange={(e) => setType(e.target.value as 'office' | 'client')}>
+              <option value="office">🏠 オフィス</option>
+              <option value="client">🏢 常駐先（クライアント先）</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>勤務地名 <span className="required">*必須</span></label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={type === 'office' ? '例: 本社オフィス' : '例: A社、B社'}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>時給（円） <span className="required">*必須</span></label>
+            <input
+              type="number"
+              value={hourlyWage}
+              onChange={(e) => setHourlyWage(e.target.value)}
+              placeholder="例: 1500"
+            />
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button onClick={addLocation} className="submit-btn">➕ 勤務地を追加</button>
+        </div>
       </div>
 
       <h3>登録済み常駐先</h3>
@@ -358,14 +377,12 @@ function LocationManagement() {
               )}
             </div>
             <div className="location-actions">
-              {location.type === 'client' && (
-                <button
-                  className="edit-btn"
-                  onClick={() => openMemberSettings(location)}
-                >
-                  メンバー登録・交通費設定
-                </button>
-              )}
+              <button
+                className="edit-btn"
+                onClick={() => openMemberSettings(location)}
+              >
+                👥 メンバー設定
+              </button>
               <button className="delete-btn" onClick={() => deleteLocation(location.id)}>削除</button>
             </div>
           </div>
@@ -376,53 +393,85 @@ function LocationManagement() {
       )}
 
       {/* メンバー設定モーダル */}
-      {selectedLocation && selectedLocation.type === 'client' && (
+      {selectedLocation && (
         <div className="modal-overlay" onClick={() => setSelectedLocation(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>👥 {selectedLocation.name} - メンバー登録・交通費設定</h3>
+          <div className="modal-content member-settings-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>👥 {selectedLocation.name} - メンバー別設定</h3>
+
             <div className="modal-guide">
-              <p><strong>設定方法:</strong></p>
+              <p><strong>💡 この画面でできること:</strong></p>
               <ol>
-                <li>この常駐先に所属するメンバーにチェックを入れてください</li>
-                <li>チェックを入れたメンバーの交通費を入力してください</li>
-                <li>「保存」ボタンをクリックして設定を保存してください</li>
+                <li><strong>配属メンバーの選択</strong> - この{selectedLocation.type === 'office' ? 'オフィス' : '常駐先'}に所属するメンバーをチェック</li>
+                <li><strong>メンバーごとの交通費設定</strong> - 各メンバーの交通費を個別に入力（人によって金額が異なってもOK）</li>
+                <li><strong>保存して完了</strong> - 「保存」ボタンで設定を確定</li>
               </ol>
+              <p className="note">
+                {selectedLocation.type === 'office'
+                  ? '📝 オフィス勤務の場合、メンバー管理で設定した「オフィス交通費」が優先されます'
+                  : '📝 常駐先の場合、ここで設定した交通費が給与計算に使用されます'}
+              </p>
             </div>
 
-            <div className="transport-fees-list">
+            <div className="member-settings-list">
+              <h4>メンバー一覧</h4>
+              {members.length === 0 && (
+                <div className="info-text">
+                  ⚠️ メンバーが登録されていません。先に「メンバー管理」タブでメンバーを登録してください。
+                </div>
+              )}
+
               {members.map(member => (
-                <div key={member.id} className="transport-fee-item">
-                  <div className="member-checkbox">
-                    <input
-                      type="checkbox"
-                      id={`member-${member.id}`}
-                      checked={selectedMembers.includes(member.id)}
-                      onChange={() => toggleMemberSelection(member.id)}
-                    />
-                    <label htmlFor={`member-${member.id}`}>{member.name}</label>
-                  </div>
-                  {selectedMembers.includes(member.id) && (
-                    <div className="fee-input-group">
+                <div key={member.id} className="member-setting-card">
+                  <div className="member-select-row">
+                    <div className="member-checkbox">
                       <input
-                        type="number"
-                        value={memberTransportFees[member.id] || ''}
-                        onChange={(e) => updateMemberTransportFee(member.id, e.target.value)}
-                        placeholder="0"
+                        type="checkbox"
+                        id={`member-${member.id}`}
+                        checked={selectedMembers.includes(member.id)}
+                        onChange={() => toggleMemberSelection(member.id)}
                       />
-                      <span>円/日</span>
+                      <label htmlFor={`member-${member.id}`}>
+                        <strong>{member.name}</strong>
+                        {member.email && <span className="member-email">({member.email})</span>}
+                      </label>
+                    </div>
+                    {selectedLocation.type === 'office' && (
+                      <div className="member-office-fee">
+                        オフィス交通費: ¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedMembers.includes(member.id) && (
+                    <div className="fee-setting-row">
+                      <label>
+                        {selectedLocation.type === 'office' ? 'このオフィスでの交通費' : 'この常駐先での交通費'}
+                        <span className="required">*必須</span>
+                      </label>
+                      <div className="fee-input-group">
+                        <input
+                          type="number"
+                          value={memberTransportFees[member.id] || ''}
+                          onChange={(e) => updateMemberTransportFee(member.id, e.target.value)}
+                          placeholder="例: 500"
+                        />
+                        <span>円/日</span>
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
             </div>
 
-            {members.length === 0 && (
-              <p className="no-data">メンバーを先に登録してください</p>
-            )}
+            <div className="modal-summary">
+              <p>選択中のメンバー: <strong>{selectedMembers.length}人</strong></p>
+            </div>
 
             <div className="modal-actions">
-              <button onClick={saveMemberSettings} className="submit-btn">保存</button>
-              <button onClick={() => setSelectedLocation(null)} className="cancel-btn">閉じる</button>
+              <button onClick={saveMemberSettings} className="submit-btn">
+                💾 保存（{selectedMembers.length}人のメンバー設定）
+              </button>
+              <button onClick={() => setSelectedLocation(null)} className="cancel-btn">キャンセル</button>
             </div>
           </div>
         </div>

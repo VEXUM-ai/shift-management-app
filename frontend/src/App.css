@@ -1482,3 +1482,135 @@ table tfoot {
     font-size: 11px;
   }
 }
+
+/* メンバー設定モーダル */
+.member-settings-modal {
+  max-width: 700px;
+}
+
+.member-settings-list {
+  margin: 20px 0;
+}
+
+.member-settings-list h4 {
+  color: #667eea;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.member-setting-card {
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 12px;
+  transition: all 0.3s;
+}
+
+.member-setting-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.member-select-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.member-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.member-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.member-checkbox label {
+  cursor: pointer;
+  font-size: 15px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-email {
+  font-size: 13px;
+  color: #666;
+  font-weight: normal;
+}
+
+.member-office-fee {
+  font-size: 13px;
+  color: #667eea;
+  background: white;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-weight: bold;
+}
+
+.fee-setting-row {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 10px;
+  border-left: 4px solid #667eea;
+}
+
+.fee-setting-row label {
+  display: block;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.modal-summary {
+  background: #e3f2fd;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.modal-summary p {
+  margin: 0;
+  color: #1976d2;
+  font-size: 16px;
+}
+
+.modal-summary strong {
+  color: #667eea;
+  font-size: 20px;
+}
+
+@media (max-width: 768px) {
+  .member-setting-card {
+    padding: 12px;
+  }
+
+  .member-select-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .member-office-fee {
+    width: 100%;
+    text-align: center;
+  }
+
+  .fee-setting-row {
+    padding: 12px;
+  }
+}
