@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { ShiftWithMonthlyView } from './components-enhanced'
-import { EnhancedMemberManagement } from './member-management'
-import { SimpleLocationManagement } from './location-simple'
+import { SimpleMemberManagement } from './member-simple'
+import { LocationWithMemberFees } from './location-with-member-fees'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
 
@@ -51,8 +51,8 @@ function App() {
       </nav>
 
       <main>
-        {activeTab === 'members' && <EnhancedMemberManagement />}
-        {activeTab === 'locations' && <SimpleLocationManagement />}
+        {activeTab === 'members' && <SimpleMemberManagement />}
+        {activeTab === 'locations' && <LocationWithMemberFees />}
         {activeTab === 'shift' && <ShiftWithMonthlyView />}
         {activeTab === 'attendance' && <AttendanceManagement />}
         {activeTab === 'salary' && <SalaryCalculation />}

@@ -18,12 +18,12 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const { name, email, transport_fees } = req.body
+    const { name, email, office_transport_fee } = req.body
     const newMember = {
       id: Date.now(),
       name,
       email,
-      transport_fees: transport_fees || {},
+      office_transport_fee: office_transport_fee || 0,
       created_at: new Date().toISOString()
     }
     members.push(newMember)
@@ -31,7 +31,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT') {
-    const { name, email, transport_fees } = req.body
+    const { name, email, office_transport_fee } = req.body
     const index = members.findIndex(m => m.id === Number(id))
 
     if (index !== -1) {
@@ -39,7 +39,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         ...members[index],
         name,
         email,
-        transport_fees: transport_fees || {},
+        office_transport_fee: office_transport_fee || 0,
         updated_at: new Date().toISOString()
       }
       return res.json({ message: 'メンバー情報を更新しました' })
