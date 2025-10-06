@@ -256,6 +256,7 @@ function MemberManagement() {
         const name = parts[0] || ''
         const email = parts[1] || ''
         const salaryInfo = parts[2] || ''
+        const transportFee = parts[3] || '0'
 
         // 給与形態を判定
         let salaryType: 'hourly' | 'fixed' = 'hourly'
@@ -276,11 +277,15 @@ function MemberManagement() {
           }
         }
 
+        // 交通費を数値に変換（カンマと¥記号を除去）
+        const cleanTransportFee = transportFee.replace(/[¥,]/g, '')
+        const officeTransportFeeValue = parseFloat(cleanTransportFee) || 0
+
         return {
           id: Date.now() + index,
           name,
           email,
-          office_transport_fee: 0,
+          office_transport_fee: officeTransportFeeValue,
           salary_type: salaryType,
           hourly_wage: hourlyWage,
           fixed_salary: fixedSalary,
@@ -422,7 +427,7 @@ function MemberManagement() {
           />
         </div>
         <div style={{ color: '#666', fontSize: '14px' }}>
-          形式: 名前 [TAB] メール [TAB] 給与情報（固定50万円 または 時給1500円）
+          形式: 名前 [TAB] メール [TAB] 給与情報（固定50万円 または 時給1500円） [TAB] 交通費（円）
         </div>
       </div>
 
