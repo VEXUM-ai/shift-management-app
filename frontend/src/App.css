@@ -65,14 +65,82 @@ main {
 .section h2 {
   color: #333;
   margin-bottom: 20px;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 3px solid #667eea;
   padding-bottom: 10px;
+  font-size: 24px;
 }
 
 .section h3 {
   color: #555;
   margin-top: 30px;
   margin-bottom: 15px;
+  font-size: 18px;
+}
+
+/* ガイドボックス */
+.guide-box {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border-left: 4px solid #667eea;
+  padding: 20px;
+  margin-bottom: 25px;
+  border-radius: 8px;
+}
+
+.guide-box h3 {
+  color: #667eea;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.guide-box ol {
+  margin-left: 20px;
+  line-height: 1.8;
+  color: #555;
+}
+
+.guide-box ol li {
+  margin-bottom: 8px;
+}
+
+.guide-box .note {
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 5px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.required {
+  color: #f44336;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.optional {
+  color: #999;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.modal-guide {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.modal-guide p {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.modal-guide ol {
+  margin-left: 20px;
+  line-height: 1.8;
+  color: #555;
 }
 
 .form {
@@ -100,26 +168,35 @@ main {
 
 .form button,
 .clock-buttons button {
-  padding: 10px 20px;
+  padding: 12px 24px;
   background: #667eea;
   color: white;
   border: none;
-  border-radius: 5px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
   font-weight: bold;
   cursor: pointer;
-  transition: background 0.3s;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
 }
 
 .form button:hover,
 .clock-buttons button:hover:not(:disabled) {
   background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+}
+
+.form button:active,
+.clock-buttons button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .form button:disabled,
 .clock-buttons button:disabled {
   background: #ccc;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* シフト一括登録 */
@@ -480,15 +557,21 @@ table tfoot {
 
 .form-group input {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 2px solid #ddd;
-  border-radius: 5px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input::placeholder {
+  color: #aaa;
 }
 
 .transport-fees-section {

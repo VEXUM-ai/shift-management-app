@@ -118,27 +118,36 @@ function MemberManagement() {
 
   return (
     <div className="section">
-      <h2>メンバー登録</h2>
-      <p className="info-text">※ 常駐先への交通費は「常駐先管理」で設定します</p>
+      <h2>📋 メンバー登録</h2>
+      <div className="guide-box">
+        <h3>使い方</h3>
+        <ol>
+          <li>メンバーの名前を入力してください（必須）</li>
+          <li>メールアドレスを入力してください（任意）</li>
+          <li>オフィスまでの交通費を入力してください</li>
+          <li>「メンバー追加」ボタンをクリックして登録</li>
+        </ol>
+        <p className="note">💡 常駐先への交通費は「常駐先管理」タブで設定できます</p>
+      </div>
 
       <div className="member-form">
         <div className="form-group">
-          <label>名前 *</label>
+          <label>名前 <span className="required">*必須</span></label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="山田太郎"
+            placeholder="例: 山田太郎"
           />
         </div>
 
         <div className="form-group">
-          <label>メールアドレス</label>
+          <label>メールアドレス <span className="optional">任意</span></label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="example@example.com"
+            placeholder="例: yamada@example.com"
           />
         </div>
 
@@ -148,12 +157,14 @@ function MemberManagement() {
             type="number"
             value={officeTransportFee}
             onChange={(e) => setOfficeTransportFee(e.target.value)}
-            placeholder="500"
+            placeholder="例: 500"
           />
         </div>
 
         <div className="form-actions">
-          <button onClick={addMember} className="submit-btn">メンバー追加</button>
+          <button onClick={addMember} className="submit-btn">
+            ➕ メンバー追加
+          </button>
         </div>
       </div>
 
@@ -300,27 +311,36 @@ function LocationManagement() {
 
   return (
     <div className="section">
-      <h2>常駐先・勤務地登録</h2>
-      <p className="info-text">※ 常駐先を追加後、「メンバー登録・交通費設定」ボタンで所属メンバーと交通費を登録できます</p>
+      <h2>🏢 常駐先・勤務地登録</h2>
+      <div className="guide-box">
+        <h3>使い方</h3>
+        <ol>
+          <li>「オフィス」または「常駐先」を選択してください</li>
+          <li>勤務地の名前を入力してください</li>
+          <li>時給を入力してください</li>
+          <li>「追加」ボタンをクリックして登録</li>
+          <li>常駐先の場合、「メンバー登録・交通費設定」ボタンで所属メンバーと交通費を設定できます</li>
+        </ol>
+      </div>
 
       <div className="form">
         <select value={type} onChange={(e) => setType(e.target.value as 'office' | 'client')}>
-          <option value="office">オフィス</option>
-          <option value="client">常駐先</option>
+          <option value="office">🏠 オフィス</option>
+          <option value="client">🏢 常駐先</option>
         </select>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={type === 'office' ? 'オフィス' : '常駐先名（例: A社、B社）'}
+          placeholder={type === 'office' ? '例: 本社オフィス' : '例: A社、B社'}
         />
         <input
           type="number"
           value={hourlyWage}
           onChange={(e) => setHourlyWage(e.target.value)}
-          placeholder="時給（円）"
+          placeholder="例: 1500"
         />
-        <button onClick={addLocation}>追加</button>
+        <button onClick={addLocation}>➕ 追加</button>
       </div>
 
       <h3>登録済み常駐先</h3>
@@ -359,8 +379,15 @@ function LocationManagement() {
       {selectedLocation && selectedLocation.type === 'client' && (
         <div className="modal-overlay" onClick={() => setSelectedLocation(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>{selectedLocation.name} - メンバー登録・交通費設定</h3>
-            <p className="modal-description">この常駐先に所属するメンバーを選択し、交通費を設定してください</p>
+            <h3>👥 {selectedLocation.name} - メンバー登録・交通費設定</h3>
+            <div className="modal-guide">
+              <p><strong>設定方法:</strong></p>
+              <ol>
+                <li>この常駐先に所属するメンバーにチェックを入れてください</li>
+                <li>チェックを入れたメンバーの交通費を入力してください</li>
+                <li>「保存」ボタンをクリックして設定を保存してください</li>
+              </ol>
+            </div>
 
             <div className="transport-fees-list">
               {members.map(member => (
