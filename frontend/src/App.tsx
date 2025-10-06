@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
+type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'attendance' | 'salary'
 type UserRole = 'admin' | 'member'
 
 // LocalStorage Keys
@@ -162,7 +162,13 @@ function App() {
           className={activeTab === 'shift' ? 'active' : ''}
           onClick={() => setActiveTab('shift')}
         >
-          シフト管理
+          シフト登録
+        </button>
+        <button
+          className={activeTab === 'shiftlist' ? 'active' : ''}
+          onClick={() => setActiveTab('shiftlist')}
+        >
+          シフト一覧
         </button>
         <button
           className={activeTab === 'attendance' ? 'active' : ''}
@@ -184,6 +190,7 @@ function App() {
         {activeTab === 'members' && userRole === 'admin' && <MemberManagement />}
         {activeTab === 'locations' && userRole === 'admin' && <LocationManagement />}
         {activeTab === 'shift' && <ShiftManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
+        {activeTab === 'shiftlist' && <ShiftListView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'attendance' && <AttendanceManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
       </main>
@@ -1776,6 +1783,382 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           </button>
         </div>
       </div>
+
+      {/* シフト情報編集モーダル */}
+      {editingShiftInfo && (
+        <div className="modal-overlay" onClick={cancelEditShiftInfo}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>✏️ シフト情報編集</h3>
+            <div className="modal-guide">
+              <p><strong>元のシフト情報:</strong></p>
+              <p>メンバー: {editingShiftInfo.member_name}</p>
+              <p>勤務地: {editingShiftInfo.location_name}</p>
+              <p>日付: {editingShiftInfo.date}</p>
+            </div>
+
+            <div className="time-edit-form">
+              <div className="form-group">
+                <label>メンバー <span className="required">*必須</span></label>
+                <select
+                  value={editMember}
+                  onChange={(e) => setEditMember(e.target.value)}
+                >
+                  <option value="">選択してください</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>勤務地 <span className="required">*必須</span></label>
+                <select
+                  value={editLocation}
+                  onChange={(e) => {
+                    setEditLocation(e.target.value)
+                    if (e.target.value === '0') {
+                      setEditIsOther(true)
+                    } else {
+                      setEditIsOther(false)
+                    }
+                  }}
+                >
+                  <option value="">選択してください</option>
+                  {locations.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                  <option value="-1">オフィス</option>
+                  <option value="0">その他</option>
+                </select>
+              </div>
+
+              {editIsOther && (
+                <div className="form-group">
+                  <label>活動内容</label>
+                  <input
+                    type="text"
+                    value={editOtherActivity}
+                    onChange={(e) => setEditOtherActivity(e.target.value)}
+                    placeholder="例: 研修、営業"
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={editIncludeOffice}
+                    onChange={(e) => setEditIncludeOffice(e.target.checked)}
+                    style={{ width: 'auto', marginRight: '8px' }}
+                    disabled={editLocation === '-1' || editIsOther}
+                  />
+                  オフィスにも出勤
+                </label>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveEditShiftInfo} className="submit-btn">💾 保存</button>
+              <button onClick={cancelEditShiftInfo} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// シフト一覧表示
+function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
+  const [shifts, setShifts] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [attendance, setAttendance] = useState<any[]>([])
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [filterMember, setFilterMember] = useState('')
+  const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
+  const [editingShiftInfo, setEditingShiftInfo] = useState<any>(null)
+  const [editMember, setEditMember] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editIncludeOffice, setEditIncludeOffice] = useState(false)
+  const [editIsOther, setEditIsOther] = useState(false)
+  const [editOtherActivity, setEditOtherActivity] = useState('')
+
+  useEffect(() => {
+    loadShifts()
+    loadMembers()
+    loadLocations()
+    loadAttendance()
+
+    const now = new Date()
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(monthStr)
+  }, [])
+
+  const loadShifts = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+    if (stored) {
+      setShifts(JSON.parse(stored))
+    }
+  }
+
+  const loadMembers = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+    if (stored) {
+      setMembers(JSON.parse(stored))
+    }
+  }
+
+  const loadLocations = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+    if (stored) {
+      setLocations(JSON.parse(stored))
+    }
+  }
+
+  const loadAttendance = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+    if (stored) {
+      setAttendance(JSON.parse(stored))
+    }
+  }
+
+  const saveShifts = (data: any[]) => {
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data))
+    setShifts(data)
+  }
+
+  const deleteShift = (id: number) => {
+    if (!confirm('このシフトを削除しますか？')) return
+    const updated = shifts.filter(s => s.id !== id)
+    saveShifts(updated)
+  }
+
+  const toggleShiftSelection = (id: number) => {
+    if (selectedShiftsForDelete.includes(id)) {
+      setSelectedShiftsForDelete(selectedShiftsForDelete.filter(shiftId => shiftId !== id))
+    } else {
+      setSelectedShiftsForDelete([...selectedShiftsForDelete, id])
+    }
+  }
+
+  const selectAllShiftsInDate = (date: string) => {
+    const dateShifts = groupedByDate[date] || []
+    const dateShiftIds = dateShifts.map((s: any) => s.id)
+    const allSelected = dateShiftIds.every((id: number) => selectedShiftsForDelete.includes(id))
+
+    if (allSelected) {
+      setSelectedShiftsForDelete(selectedShiftsForDelete.filter(id => !dateShiftIds.includes(id)))
+    } else {
+      const newSelection = [...selectedShiftsForDelete]
+      dateShiftIds.forEach((id: number) => {
+        if (!newSelection.includes(id)) {
+          newSelection.push(id)
+        }
+      })
+      setSelectedShiftsForDelete(newSelection)
+    }
+  }
+
+  const bulkDeleteShifts = () => {
+    if (!confirm(`選択した${selectedShiftsForDelete.length}件のシフトを削除しますか？`)) return
+    const updated = shifts.filter(s => !selectedShiftsForDelete.includes(s.id))
+    saveShifts(updated)
+    setSelectedShiftsForDelete([])
+  }
+
+  const reregisterFromDate = (date: string) => {
+    const dateShifts = groupedByDate[date] || []
+    const uniqueMembers = Array.from(new Set(dateShifts.map((s: any) => s.member_id)))
+
+    if (uniqueMembers.length === 0) return
+
+    let selectedMemberForReregister
+    if (uniqueMembers.length === 1) {
+      selectedMemberForReregister = uniqueMembers[0]
+    } else {
+      const memberNames = uniqueMembers.map(memberId => {
+        const shift = dateShifts.find((s: any) => s.member_id === memberId)
+        return shift?.member_name || ''
+      })
+      const selected = prompt(`この日には複数のメンバーがいます。再登録するメンバーを選択してください:\n${memberNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}\n\n番号を入力:`)
+      if (!selected) return
+      const index = parseInt(selected) - 1
+      if (index < 0 || index >= uniqueMembers.length) {
+        alert('無効な選択です')
+        return
+      }
+      selectedMemberForReregister = uniqueMembers[index]
+    }
+
+    // シフト登録画面に移動するメッセージ
+    alert(`${dateShifts.find((s: any) => s.member_id === selectedMemberForReregister)?.member_name}さんのシフトを再登録します。シフト登録タブで設定してください。`)
+  }
+
+  const openEditShiftInfo = (shift: any) => {
+    setEditingShiftInfo(shift)
+    setEditMember(String(shift.member_id))
+    setEditLocation(String(shift.location_id))
+    setEditIsOther(shift.is_other || false)
+    setEditOtherActivity(shift.is_other ? shift.location_name.replace('その他: ', '') : '')
+    setEditIncludeOffice(false)
+  }
+
+  const cancelEditShiftInfo = () => {
+    setEditingShiftInfo(null)
+    setEditMember('')
+    setEditLocation('')
+    setEditIncludeOffice(false)
+    setEditIsOther(false)
+    setEditOtherActivity('')
+  }
+
+  const saveEditShiftInfo = () => {
+    if (!editMember || !editLocation) {
+      alert('メンバーと勤務地を選択してください')
+      return
+    }
+
+    if (editIsOther && !editOtherActivity) {
+      alert('活動内容を入力してください')
+      return
+    }
+
+    const member = members.find(m => m.id === Number(editMember))
+    const location = locations.find(l => l.id === Number(editLocation))
+
+    let locationName = ''
+    let locationId = Number(editLocation)
+
+    if (editIsOther) {
+      locationName = `その他: ${editOtherActivity}`
+      locationId = 0
+    } else if (editLocation === '-1') {
+      locationName = 'オフィス'
+      locationId = -1
+    } else {
+      locationName = location?.name || ''
+    }
+
+    const updatedShift = {
+      ...editingShiftInfo,
+      member_id: member.id,
+      member_name: member.name,
+      location_id: locationId,
+      location_name: locationName,
+      is_other: editIsOther
+    }
+
+    let updated = shifts.map(s => s.id === editingShiftInfo.id ? updatedShift : s)
+
+    // オフィス出勤の追加・削除
+    const existingOfficeShift = shifts.find(s =>
+      s.date === editingShiftInfo.date &&
+      s.member_id === member.id &&
+      s.location_id === -1
+    )
+
+    if (editIncludeOffice && !existingOfficeShift && editLocation !== '-1' && !editIsOther) {
+      updated.push({
+        id: Date.now(),
+        member_id: member.id,
+        member_name: member.name,
+        location_id: -1,
+        location_name: 'オフィス',
+        is_other: false,
+        date: editingShiftInfo.date,
+        start_time: null,
+        end_time: null,
+        status: '提出済み',
+        created_at: new Date().toISOString()
+      })
+    } else if (!editIncludeOffice && existingOfficeShift) {
+      updated = updated.filter(s => s.id !== existingOfficeShift.id)
+    }
+
+    saveShifts(updated)
+    cancelEditShiftInfo()
+    alert('シフト情報を更新しました')
+  }
+
+  const exportCSV = () => {
+    const filtered = filteredShifts
+    if (filtered.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['メンバー', '勤務地', '日付', '開始時間', '終了時間', 'ステータス']
+    const rows = filtered.map(s => [
+      s.member_name,
+      s.location_name,
+      s.date,
+      s.start_time || '',
+      s.end_time || '',
+      s.status
+    ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `shifts_${selectedMonth}.csv`
+    link.click()
+  }
+
+  // 勤怠データをシフトに反映
+  const getShiftWithAttendance = (shift: any) => {
+    const attendanceRecord = attendance.find(
+      a => a.member_id === shift.member_id && a.date === shift.date
+    )
+
+    if (attendanceRecord && attendanceRecord.clock_in && attendanceRecord.clock_out) {
+      return {
+        ...shift,
+        start_time: attendanceRecord.clock_in,
+        end_time: attendanceRecord.clock_out,
+        from_attendance: true
+      }
+    }
+
+    return shift
+  }
+
+  let filteredShifts = selectedMonth
+    ? shifts.filter(s => s.date.startsWith(selectedMonth))
+        .map(getShiftWithAttendance)
+        .sort((a, b) => a.date.localeCompare(b.date))
+    : shifts.map(getShiftWithAttendance).sort((a, b) => a.date.localeCompare(b.date))
+
+  // 個人ページの場合は自動的にフィルタリング
+  if (selectedMemberId) {
+    filteredShifts = filteredShifts.filter(s => s.member_id === selectedMemberId)
+  }
+
+  // メンバーフィルター適用
+  if (filterMember) {
+    filteredShifts = filteredShifts.filter(s => s.member_id === Number(filterMember))
+  }
+
+  // 日付ごとにグループ化
+  const groupedByDate = filteredShifts.reduce((acc: any, shift: any) => {
+    if (!acc[shift.date]) {
+      acc[shift.date] = []
+    }
+    acc[shift.date].push(shift)
+    return acc
+  }, {})
+
+  return (
+    <div className="section">
+      <h2>📋 シフト一覧{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+      {selectedMemberId && currentMemberName && (
+        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+          👤 {currentMemberName}さんのシフトのみを表示しています
+        </div>
+      )}
 
       <div className="filter-section">
         <h3>📊 シフト確認</h3>
