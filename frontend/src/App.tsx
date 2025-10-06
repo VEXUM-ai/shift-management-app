@@ -1502,15 +1502,23 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
       calendar.push({ isEmpty: true })
     }
 
+    // フィルタリング適用
+    let calendarFilteredShifts = shifts
+
     // 個人ページの場合はフィルタリング
-    const filteredShifts = selectedMemberId
-      ? shifts.filter(s => s.member_id === selectedMemberId)
-      : shifts
+    if (selectedMemberId) {
+      calendarFilteredShifts = calendarFilteredShifts.filter(s => s.member_id === selectedMemberId)
+    }
+
+    // メンバーフィルター適用
+    if (filterMember) {
+      calendarFilteredShifts = calendarFilteredShifts.filter(s => s.member_id === Number(filterMember))
+    }
 
     // 各日付のシフトデータを集約
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dayShifts = filteredShifts.filter(s => s.date === dateStr)
+      const dayShifts = calendarFilteredShifts.filter(s => s.date === dateStr)
 
       calendar.push({
         date: dateStr,
@@ -1780,18 +1788,20 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
               onChange={(e) => setSelectedMonth(e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label>メンバーで絞り込み</label>
-            <select
-              value={filterMember}
-              onChange={(e) => setFilterMember(e.target.value)}
-            >
-              <option value="">全メンバー</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
+          {!selectedMemberId && (
+            <div className="form-group">
+              <label>メンバーで絞り込み</label>
+              <select
+                value={filterMember}
+                onChange={(e) => setFilterMember(e.target.value)}
+              >
+                <option value="">全メンバー</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
         </div>
       </div>
