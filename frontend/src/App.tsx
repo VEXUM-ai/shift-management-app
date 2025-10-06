@@ -2,37 +2,95 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
+type UserRole = 'admin' | 'member'
 
 // LocalStorage Keys
 const STORAGE_KEYS = {
   MEMBERS: 'shift_app_members',
   LOCATIONS: 'shift_app_locations',
   SHIFTS: 'shift_app_shifts',
-  ATTENDANCE: 'shift_app_attendance'
+  ATTENDANCE: 'shift_app_attendance',
+  USER_ROLE: 'shift_app_user_role'
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('members')
+  const [activeTab, setActiveTab] = useState<Tab>('shift')
+  const [userRole, setUserRole] = useState<UserRole>('member')
+  const [isRoleSelected, setIsRoleSelected] = useState(false)
+
+  useEffect(() => {
+    const storedRole = localStorage.getItem(STORAGE_KEYS.USER_ROLE)
+    if (storedRole) {
+      setUserRole(storedRole as UserRole)
+      setIsRoleSelected(true)
+    }
+  }, [])
+
+  const selectRole = (role: UserRole) => {
+    setUserRole(role)
+    setIsRoleSelected(true)
+    localStorage.setItem(STORAGE_KEYS.USER_ROLE, role)
+  }
+
+  const switchRole = () => {
+    setIsRoleSelected(false)
+    localStorage.removeItem(STORAGE_KEYS.USER_ROLE)
+  }
+
+  if (!isRoleSelected) {
+    return (
+      <div className="app">
+        <div className="role-selection">
+          <h1>🔐 ログイン</h1>
+          <p>アクセス権限を選択してください</p>
+          <div className="role-buttons">
+            <button className="role-btn admin-btn" onClick={() => selectRole('admin')}>
+              <span className="role-icon">👔</span>
+              <span className="role-title">管理者</span>
+              <span className="role-desc">メンバー管理・給与設定・全機能利用可能</span>
+            </button>
+            <button className="role-btn member-btn" onClick={() => selectRole('member')}>
+              <span className="role-icon">👤</span>
+              <span className="role-title">メンバー</span>
+              <span className="role-desc">シフト提出・勤怠打刻のみ</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="app">
       <header>
         <h1>勤怠・シフト管理システム</h1>
+        <div className="user-info">
+          <span className="current-role">
+            {userRole === 'admin' ? '👔 管理者' : '👤 メンバー'}
+          </span>
+          <button className="switch-role-btn" onClick={switchRole}>
+            🔄 切り替え
+          </button>
+        </div>
       </header>
 
       <nav className="tabs">
-        <button
-          className={activeTab === 'members' ? 'active' : ''}
-          onClick={() => setActiveTab('members')}
-        >
-          メンバー管理
-        </button>
-        <button
-          className={activeTab === 'locations' ? 'active' : ''}
-          onClick={() => setActiveTab('locations')}
-        >
-          常駐先管理
-        </button>
+        {userRole === 'admin' && (
+          <>
+            <button
+              className={activeTab === 'members' ? 'active' : ''}
+              onClick={() => setActiveTab('members')}
+            >
+              メンバー管理
+            </button>
+            <button
+              className={activeTab === 'locations' ? 'active' : ''}
+              onClick={() => setActiveTab('locations')}
+            >
+              常駐先管理
+            </button>
+          </>
+        )}
         <button
           className={activeTab === 'shift' ? 'active' : ''}
           onClick={() => setActiveTab('shift')}
@@ -45,20 +103,22 @@ function App() {
         >
           勤怠管理
         </button>
-        <button
-          className={activeTab === 'salary' ? 'active' : ''}
-          onClick={() => setActiveTab('salary')}
-        >
-          給与計算
-        </button>
+        {userRole === 'admin' && (
+          <button
+            className={activeTab === 'salary' ? 'active' : ''}
+            onClick={() => setActiveTab('salary')}
+          >
+            給与計算
+          </button>
+        )}
       </nav>
 
       <main>
-        {activeTab === 'members' && <MemberManagement />}
-        {activeTab === 'locations' && <LocationManagement />}
+        {activeTab === 'members' && userRole === 'admin' && <MemberManagement />}
+        {activeTab === 'locations' && userRole === 'admin' && <LocationManagement />}
         {activeTab === 'shift' && <ShiftManagement />}
         {activeTab === 'attendance' && <AttendanceManagement />}
-        {activeTab === 'salary' && <SalaryCalculation />}
+        {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation />}
       </main>
     </div>
   )
@@ -70,6 +130,9 @@ function MemberManagement() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [officeTransportFee, setOfficeTransportFee] = useState('')
+  const [salaryType, setSalaryType] = useState<'hourly' | 'fixed'>('hourly')
+  const [hourlyWage, setHourlyWage] = useState('')
+  const [fixedSalary, setFixedSalary] = useState('')
 
   useEffect(() => {
     loadMembers()
@@ -93,11 +156,24 @@ function MemberManagement() {
       return
     }
 
+    if (salaryType === 'hourly' && !hourlyWage) {
+      alert('時給を入力してください')
+      return
+    }
+
+    if (salaryType === 'fixed' && !fixedSalary) {
+      alert('固定給与を入力してください')
+      return
+    }
+
     const newMember = {
       id: Date.now(),
       name,
       email,
       office_transport_fee: parseFloat(officeTransportFee || '0'),
+      salary_type: salaryType,
+      hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
+      fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
       created_at: new Date().toISOString()
     }
 
@@ -107,6 +183,8 @@ function MemberManagement() {
     setName('')
     setEmail('')
     setOfficeTransportFee('')
+    setHourlyWage('')
+    setFixedSalary('')
     alert('メンバーを追加しました')
   }
 
@@ -118,47 +196,85 @@ function MemberManagement() {
 
   return (
     <div className="section">
-      <h2>📋 メンバー登録</h2>
+      <h2>👔 メンバー管理（管理者専用）</h2>
       <div className="guide-box">
-        <h3>使い方</h3>
+        <h3>✨ 使い方</h3>
         <ol>
-          <li>メンバーの名前を入力してください（必須）</li>
-          <li>メールアドレスを入力してください（任意）</li>
-          <li>オフィスまでの交通費を入力してください</li>
-          <li>「メンバー追加」ボタンをクリックして登録</li>
+          <li><strong>基本情報:</strong> メンバーの名前とメールアドレスを入力</li>
+          <li><strong>給与形態選択:</strong> 時給制または固定給与制を選択</li>
+          <li><strong>給与額設定:</strong> 時給または月額固定給与を入力</li>
+          <li><strong>交通費設定:</strong> オフィスまでの交通費を入力</li>
         </ol>
-        <p className="note">💡 常駐先への交通費は「常駐先管理」タブで設定できます</p>
+        <p className="note">💡 常駐先ごとの交通費は「常駐先管理」タブで個別設定できます</p>
       </div>
 
       <div className="member-form">
-        <div className="form-group">
-          <label>名前 <span className="required">*必須</span></label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例: 山田太郎"
-          />
+        <h3>👤 新しいメンバーを追加</h3>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>名前 <span className="required">*必須</span></label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例: 山田太郎"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>メールアドレス <span className="optional">任意</span></label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="例: yamada@example.com"
+            />
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>メールアドレス <span className="optional">任意</span></label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="例: yamada@example.com"
-          />
+        <div className="form-row">
+          <div className="form-group">
+            <label>給与形態 <span className="required">*必須</span></label>
+            <select value={salaryType} onChange={(e) => setSalaryType(e.target.value as 'hourly' | 'fixed')}>
+              <option value="hourly">⏰ 時給制</option>
+              <option value="fixed">💰 固定給与制</option>
+            </select>
+          </div>
+
+          {salaryType === 'hourly' ? (
+            <div className="form-group">
+              <label>時給（円） <span className="required">*必須</span></label>
+              <input
+                type="number"
+                value={hourlyWage}
+                onChange={(e) => setHourlyWage(e.target.value)}
+                placeholder="例: 1500"
+              />
+            </div>
+          ) : (
+            <div className="form-group">
+              <label>月額固定給与（円） <span className="required">*必須</span></label>
+              <input
+                type="number"
+                value={fixedSalary}
+                onChange={(e) => setFixedSalary(e.target.value)}
+                placeholder="例: 250000"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="form-group">
-          <label>オフィスまでの交通費（円/日）</label>
-          <input
-            type="number"
-            value={officeTransportFee}
-            onChange={(e) => setOfficeTransportFee(e.target.value)}
-            placeholder="例: 500"
-          />
+        <div className="form-row">
+          <div className="form-group">
+            <label>オフィスまでの交通費（円/日） <span className="optional">任意</span></label>
+            <input
+              type="number"
+              value={officeTransportFee}
+              onChange={(e) => setOfficeTransportFee(e.target.value)}
+              placeholder="例: 500"
+            />
+          </div>
         </div>
 
         <div className="form-actions">
@@ -168,13 +284,15 @@ function MemberManagement() {
         </div>
       </div>
 
-      <h3>メンバー一覧</h3>
+      <h3>📋 登録済みメンバー一覧</h3>
       <div className="members-table-wrapper">
         <table>
           <thead>
             <tr>
               <th>名前</th>
               <th>メール</th>
+              <th>給与形態</th>
+              <th>給与額</th>
               <th>オフィス交通費</th>
               <th>操作</th>
             </tr>
@@ -184,7 +302,18 @@ function MemberManagement() {
               <tr key={member.id}>
                 <td><strong>{member.name}</strong></td>
                 <td>{member.email || '-'}</td>
-                <td>¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}</td>
+                <td>
+                  <span className={`salary-type-badge ${member.salary_type === 'hourly' ? 'hourly' : 'fixed'}`}>
+                    {member.salary_type === 'hourly' ? '⏰ 時給制' : '💰 固定給与'}
+                  </span>
+                </td>
+                <td>
+                  {member.salary_type === 'hourly'
+                    ? `¥${(member.hourly_wage || 0).toLocaleString('ja-JP')}/時間`
+                    : `¥${(member.fixed_salary || 0).toLocaleString('ja-JP')}/月`
+                  }
+                </td>
+                <td>¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日</td>
                 <td>
                   <button className="delete-btn" onClick={() => deleteMember(member.id)}>削除</button>
                 </td>
@@ -205,7 +334,6 @@ function LocationManagement() {
   const [locations, setLocations] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [name, setName] = useState('')
-  const [hourlyWage, setHourlyWage] = useState('')
   const [type, setType] = useState<'office' | 'client'>('client')
   const [selectedLocation, setSelectedLocation] = useState<any>(null)
   const [memberTransportFees, setMemberTransportFees] = useState<{[key: number]: string}>({})
@@ -236,15 +364,14 @@ function LocationManagement() {
   }
 
   const addLocation = () => {
-    if (!name || !hourlyWage) {
-      alert('名前と時給を入力してください')
+    if (!name) {
+      alert('勤務地名を入力してください')
       return
     }
 
     const newLocation = {
       id: Date.now(),
       name,
-      hourly_wage: parseFloat(hourlyWage),
       type,
       member_transport_fees: {},
       created_at: new Date().toISOString()
@@ -254,8 +381,7 @@ function LocationManagement() {
     saveLocations(updated)
 
     setName('')
-    setHourlyWage('')
-    alert('常駐先を追加しました')
+    alert('勤務地を追加しました')
   }
 
   const deleteLocation = (id: number) => {
@@ -325,6 +451,8 @@ function LocationManagement() {
 
       <div className="member-form">
         <h3>🏢 新しい勤務地を追加</h3>
+        <p className="info-text">💡 給与設定はメンバー管理で行います。ここでは勤務地の登録とメンバー配属を行います。</p>
+
         <div className="form-row">
           <div className="form-group">
             <label>種別 <span className="required">*必須</span></label>
@@ -333,9 +461,7 @@ function LocationManagement() {
               <option value="client">🏢 常駐先（クライアント先）</option>
             </select>
           </div>
-        </div>
 
-        <div className="form-row">
           <div className="form-group">
             <label>勤務地名 <span className="required">*必須</span></label>
             <input
@@ -345,16 +471,6 @@ function LocationManagement() {
               placeholder={type === 'office' ? '例: 本社オフィス' : '例: A社、B社'}
             />
           </div>
-
-          <div className="form-group">
-            <label>時給（円） <span className="required">*必須</span></label>
-            <input
-              type="number"
-              value={hourlyWage}
-              onChange={(e) => setHourlyWage(e.target.value)}
-              placeholder="例: 1500"
-            />
-          </div>
         </div>
 
         <div className="form-actions">
@@ -362,17 +478,16 @@ function LocationManagement() {
         </div>
       </div>
 
-      <h3>登録済み常駐先</h3>
+      <h3>📋 登録済み勤務地一覧</h3>
       <div className="locations-grid">
         {locations.map((location) => (
           <div key={location.id} className="location-card">
             <div className="location-info">
-              <span className="location-type">{location.type === 'office' ? 'オフィス' : '常駐先'}</span>
+              <span className="location-type">{location.type === 'office' ? '🏠 オフィス' : '🏢 常駐先'}</span>
               <h4>{location.name}</h4>
-              <p>時給: ¥{location.hourly_wage?.toLocaleString('ja-JP')}</p>
               {Object.keys(location.member_transport_fees || {}).length > 0 && (
                 <span className="member-count">
-                  {Object.keys(location.member_transport_fees).length}人登録済み
+                  👥 {Object.keys(location.member_transport_fees).length}人配属済み
                 </span>
               )}
             </div>

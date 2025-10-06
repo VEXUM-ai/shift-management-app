@@ -17,11 +17,47 @@ header {
   border-radius: 10px;
   margin-bottom: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 header h1 {
   color: #333;
   font-size: 28px;
+  margin: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.current-role {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.switch-role-btn {
+  padding: 8px 16px;
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.switch-role-btn:hover {
+  background: #667eea;
+  color: white;
 }
 
 .tabs {
@@ -1612,5 +1648,114 @@ table tfoot {
 
   .fee-setting-row {
     padding: 12px;
+  }
+}
+
+/* ロール選択画面 */
+.role-selection {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.role-selection h1 {
+  color: white;
+  font-size: 36px;
+  margin-bottom: 15px;
+}
+
+.role-selection > p {
+  color: white;
+  font-size: 18px;
+  margin-bottom: 40px;
+}
+
+.role-buttons {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.role-btn {
+  background: white;
+  border: none;
+  border-radius: 15px;
+  padding: 40px 30px;
+  width: 280px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.role-btn:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.role-btn.admin-btn:hover {
+  border: 3px solid #667eea;
+}
+
+.role-btn.member-btn:hover {
+  border: 3px solid #28a745;
+}
+
+.role-icon {
+  font-size: 64px;
+}
+
+.role-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.role-desc {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* 給与タイプバッジ */
+.salary-type-badge {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.salary-type-badge.hourly {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.salary-type-badge.fixed {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .role-buttons {
+    flex-direction: column;
+  }
+
+  .role-btn {
+    width: 100%;
+    max-width: 350px;
   }
 }
