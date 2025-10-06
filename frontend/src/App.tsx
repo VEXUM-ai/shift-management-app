@@ -2386,14 +2386,17 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
   const [members, setMembers] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
   const [attendance, setAttendance] = useState<any[]>([])
+  const [shifts, setShifts] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
   const [salaryData, setSalaryData] = useState<any>(null)
+  const [calculationType, setCalculationType] = useState<'actual' | 'estimated'>('actual')
 
   useEffect(() => {
     loadMembers()
     loadLocations()
     loadAttendance()
+    loadShifts()
 
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -2407,10 +2410,12 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
 
   // 個人ページで自動計算
   useEffect(() => {
-    if (selectedMemberId && selectedMember && selectedMonth && members.length > 0 && attendance.length > 0) {
-      calculateSalary()
+    if (selectedMemberId && selectedMember && selectedMonth && members.length > 0) {
+      if ((calculationType === 'actual' && attendance.length > 0) || (calculationType === 'estimated' && shifts.length > 0)) {
+        calculateSalary()
+      }
     }
-  }, [selectedMemberId, selectedMember, selectedMonth, members, attendance])
+  }, [selectedMemberId, selectedMember, selectedMonth, members, attendance, shifts, calculationType])
 
   const loadMembers = () => {
     const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
@@ -2433,6 +2438,13 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
     }
   }
 
+  const loadShifts = () => {
+    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+    if (stored) {
+      setShifts(JSON.parse(stored))
+    }
+  }
+
   const calculateSalary = () => {
     if (!selectedMember || !selectedMonth) {
       alert('メンバーと月を選択してください')
@@ -2440,69 +2452,181 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
     }
 
     const member = members.find(m => m.id === Number(selectedMember))
-    const records = attendance.filter(a =>
-      a.member_id === Number(selectedMember) &&
-      a.date.startsWith(selectedMonth) &&
-      a.total_hours
-    )
 
-    if (records.length === 0) {
-      alert('該当する勤怠記録がありません')
-      return
-    }
+    if (calculationType === 'actual') {
+      // 実績ベース（勤怠記録）
+      const records = attendance.filter(a =>
+        a.member_id === Number(selectedMember) &&
+        a.date.startsWith(selectedMonth) &&
+        a.total_hours
+      )
 
-    const breakdown: any = {}
-    let totalHours = 0
-    let totalSalary = 0
-    let totalTransportFee = 0
-
-    records.forEach(record => {
-      const location = locations.find(l => l.id === record.location_id)
-      const locationName = record.location_name
-      const hourlyWage = location?.hourly_wage || 0
-      const hours = record.total_hours
-      const salary = hours * hourlyWage
-
-      // 交通費計算
-      let transportFee = 0
-      if (location?.type === 'office') {
-        transportFee = member.office_transport_fee || 0
-      } else if (location?.type === 'client') {
-        transportFee = location.member_transport_fees?.[member.id] || 0
+      if (records.length === 0) {
+        alert('該当する勤怠記録がありません')
+        setSalaryData(null)
+        return
       }
 
-      if (!breakdown[locationName]) {
-        breakdown[locationName] = {
-          days: 0,
-          hours: 0,
-          hourlyWage,
-          salary: 0,
-          transportFee: 0,
-          total: 0
+      const breakdown: any = {}
+      let totalHours = 0
+      let totalSalary = 0
+      let totalTransportFee = 0
+
+      records.forEach(record => {
+        const location = locations.find(l => l.id === record.location_id)
+        const locationName = record.location_name
+        const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+        const hours = record.total_hours
+        const salary = member.salary_type === 'hourly' ? (hours * hourlyWage) : 0
+
+        // 交通費計算
+        let transportFee = 0
+        if (record.location_id === -1) {
+          // オフィス
+          transportFee = member.office_transport_fee || 0
+        } else if (location?.type === 'client') {
+          transportFee = location.member_transport_fees?.[member.id] || 0
         }
+
+        if (!breakdown[locationName]) {
+          breakdown[locationName] = {
+            days: 0,
+            hours: 0,
+            hourlyWage,
+            salary: 0,
+            transportFee: 0,
+            total: 0
+          }
+        }
+
+        breakdown[locationName].days += 1
+        breakdown[locationName].hours += hours
+        breakdown[locationName].salary += salary
+        breakdown[locationName].transportFee += transportFee
+        breakdown[locationName].total += salary + transportFee
+
+        totalHours += hours
+        totalSalary += salary
+        totalTransportFee += transportFee
+      })
+
+      // 固定給の場合は月額を加算
+      if (member.salary_type === 'fixed') {
+        totalSalary = member.fixed_salary || 0
       }
 
-      breakdown[locationName].days += 1
-      breakdown[locationName].hours += hours
-      breakdown[locationName].salary += salary
-      breakdown[locationName].transportFee += transportFee
-      breakdown[locationName].total += salary + transportFee
+      setSalaryData({
+        member: member.name,
+        month: selectedMonth,
+        type: 'actual',
+        breakdown,
+        totalDays: records.length,
+        totalHours,
+        totalSalary,
+        totalTransportFee,
+        grandTotal: totalSalary + totalTransportFee
+      })
+    } else {
+      // 予想ベース（シフト登録）
+      const shiftRecords = shifts.filter(s =>
+        s.member_id === Number(selectedMember) &&
+        s.date.startsWith(selectedMonth)
+      )
 
-      totalHours += hours
-      totalSalary += salary
-      totalTransportFee += transportFee
-    })
+      if (shiftRecords.length === 0) {
+        alert('該当するシフト登録がありません')
+        setSalaryData(null)
+        return
+      }
 
-    setSalaryData({
-      member: member.name,
-      month: selectedMonth,
-      breakdown,
-      totalDays: records.length,
-      totalHours,
-      totalSalary,
-      totalTransportFee,
-      grandTotal: totalSalary + totalTransportFee
-    })
+      const breakdown: any = {}
+      let totalDays = 0
+      let totalHours = 0
+      let totalSalary = 0
+      let totalTransportFee = 0
+
+      // 日付ごとに集計（複数勤務地対応）
+      const dateGroups: { [key: string]: any[] } = {}
+      shiftRecords.forEach(shift => {
+        if (!dateGroups[shift.date]) {
+          dateGroups[shift.date] = []
+        }
+        dateGroups[shift.date].push(shift)
+      })
+
+      // 各日付を処理
+      Object.entries(dateGroups).forEach(([date, dayShifts]) => {
+        totalDays += 1
+
+        dayShifts.forEach(shift => {
+          const location = locations.find(l => l.id === shift.location_id)
+          const locationName = shift.location_name || 'その他'
+
+          // 予想勤務時間（デフォルト8時間）
+          const estimatedHours = 8
+          const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+          const salary = member.salary_type === 'hourly' ? (estimatedHours * hourlyWage) : 0
+
+          // 交通費計算
+          let transportFee = 0
+          if (shift.location_id === -1) {
+            // オフィス
+            transportFee = member.office_transport_fee || 0
+          } else if (shift.location_id === -2) {
+            // アドバイザー（交通費なし）
+            transportFee = 0
+          } else if (shift.is_other) {
+            // その他の活動（交通費なし）
+            transportFee = 0
+          } else if (location?.type === 'client') {
+            transportFee = location.member_transport_fees?.[member.id] || 0
+          }
+
+          if (!breakdown[locationName]) {
+            breakdown[locationName] = {
+              days: 0,
+              hours: 0,
+              hourlyWage,
+              salary: 0,
+              transportFee: 0,
+              total: 0
+            }
+          }
+
+          // シフトごとに集計（複数勤務地の場合）
+          breakdown[locationName].days += 1
+          if (member.salary_type === 'hourly') {
+            breakdown[locationName].hours += estimatedHours
+            breakdown[locationName].salary += salary
+          }
+          breakdown[locationName].transportFee += transportFee
+          breakdown[locationName].total += salary + transportFee
+
+          if (member.salary_type === 'hourly') {
+            totalHours += estimatedHours
+            totalSalary += salary
+          }
+          totalTransportFee += transportFee
+        })
+      })
+
+      // 固定給の場合は月額を設定
+      if (member.salary_type === 'fixed') {
+        totalSalary = member.fixed_salary || 0
+      }
+
+      setSalaryData({
+        member: member.name,
+        month: selectedMonth,
+        type: 'estimated',
+        breakdown,
+        totalDays,
+        totalHours,
+        totalSalary,
+        totalTransportFee,
+        grandTotal: totalSalary + totalTransportFee
+      })
+    }
   }
 
   const exportPDF = () => {
@@ -2559,17 +2683,54 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
         </div>
       )}
       <div className="guide-box">
-        <h3>使い方</h3>
+        <h3>✨ 使い方</h3>
         <ol>
-          <li>給与計算したいメンバーを選択してください</li>
-          <li>対象月を選択してください</li>
+          <li><strong>計算タイプを選択:</strong> 実績（勤怠記録から）または 予想（シフト登録から）</li>
+          <li><strong>メンバーを選択</strong>してください</li>
+          <li><strong>対象月を選択</strong>してください</li>
           <li>「計算実行」ボタンをクリック</li>
           <li>勤務地別の給与・交通費が表示されます</li>
-          <li>CSV出力で給与明細をダウンロードできます</li>
         </ol>
+        <p className="note">💡 予想計算は1日8時間で自動計算します（時給制の場合）</p>
       </div>
 
       <div className="salary-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label>計算タイプ <span className="required">*必須</span></label>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px 20px', border: '2px solid', borderColor: calculationType === 'actual' ? '#667eea' : '#ddd', borderRadius: '8px', background: calculationType === 'actual' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white', color: calculationType === 'actual' ? 'white' : '#333', fontWeight: calculationType === 'actual' ? 'bold' : 'normal', transition: 'all 0.3s ease' }}>
+                <input
+                  type="radio"
+                  name="calculationType"
+                  value="actual"
+                  checked={calculationType === 'actual'}
+                  onChange={(e) => {
+                    setCalculationType('actual')
+                    setSalaryData(null)
+                  }}
+                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                ⏰ 実績ベース（勤怠記録）
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px 20px', border: '2px solid', borderColor: calculationType === 'estimated' ? '#667eea' : '#ddd', borderRadius: '8px', background: calculationType === 'estimated' ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' : 'white', color: calculationType === 'estimated' ? 'white' : '#333', fontWeight: calculationType === 'estimated' ? 'bold' : 'normal', transition: 'all 0.3s ease' }}>
+                <input
+                  type="radio"
+                  name="calculationType"
+                  value="estimated"
+                  checked={calculationType === 'estimated'}
+                  onChange={(e) => {
+                    setCalculationType('estimated')
+                    setSalaryData(null)
+                  }}
+                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                📅 予想ベース（シフト登録）
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div className="form-row">
           {!selectedMemberId && (
             <div className="form-group">
@@ -2597,14 +2758,18 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
         </div>
 
         <div className="form-actions">
-          <button onClick={calculateSalary} className="submit-btn">🧮 計算実行</button>
+          <button onClick={calculateSalary} className="submit-btn">
+            🧮 {calculationType === 'actual' ? '実績から計算' : 'シフトから予想計算'}
+          </button>
         </div>
       </div>
 
       {salaryData && (
         <div className="salary-result">
           <div className="result-header">
-            <h3>📋 給与明細</h3>
+            <h3>
+              {salaryData.type === 'actual' ? '📋 給与明細（実績）' : '📊 予想給与明細（シフト登録ベース）'}
+            </h3>
             <div className="export-buttons">
               <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
             </div>
@@ -2613,6 +2778,7 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
           <div className="result-summary">
             <p><strong>対象:</strong> {salaryData.member}</p>
             <p><strong>対象月:</strong> {salaryData.month}</p>
+            <p><strong>計算方法:</strong> {salaryData.type === 'actual' ? '⏰ 実績ベース（打刻済み勤怠）' : '📅 予想ベース（シフト登録、1日8時間）'}</p>
           </div>
 
           <table className="salary-table">
