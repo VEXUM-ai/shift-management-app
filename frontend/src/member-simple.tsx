@@ -16,8 +16,10 @@ export function SimpleMemberManagement() {
 
   const fetchMembers = async () => {
     try {
+      console.log('Fetching members from:', `${API_BASE}/members`)
       const response = await fetch(`${API_BASE}/members`)
       const data = await response.json()
+      console.log('Fetched members:', data)
       setMembers(data)
     } catch (error) {
       console.error('Error fetching members:', error)
@@ -31,6 +33,7 @@ export function SimpleMemberManagement() {
     }
 
     try {
+      console.log('Adding member:', { name, email, office_transport_fee: parseFloat(officeTransportFee || '0') })
       const response = await fetch(`${API_BASE}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,16 +44,22 @@ export function SimpleMemberManagement() {
         })
       })
 
+      console.log('Response status:', response.status)
+      const data = await response.json()
+      console.log('Response data:', data)
+
       if (response.ok) {
         setName('')
         setEmail('')
         setOfficeTransportFee('')
-        fetchMembers()
+        await fetchMembers()
         alert('メンバーを追加しました')
+      } else {
+        alert(`エラー: ${data.error || '追加に失敗しました'}`)
       }
     } catch (error) {
       console.error('Error adding member:', error)
-      alert('メンバー追加に失敗しました')
+      alert(`メンバー追加に失敗しました: ${error}`)
     }
   }
 
