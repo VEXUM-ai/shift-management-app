@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 type Tab = 'shift' | 'attendance' | 'salary'
+
+const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('shift')
@@ -48,12 +50,41 @@ function ShiftManagement() {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
 
-  const addShift = () => {
+  useEffect(() => {
+    fetchShifts()
+  }, [])
+
+  const fetchShifts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/shifts`)
+      const data = await response.json()
+      setShifts(data)
+    } catch (error) {
+      console.error('Error fetching shifts:', error)
+    }
+  }
+
+  const addShift = async () => {
     if (date && startTime && endTime) {
-      setShifts([...shifts, { date, startTime, endTime, status: '提出済み' }])
-      setDate('')
-      setStartTime('')
-      setEndTime('')
+      try {
+        await fetch(`${API_BASE}/shifts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_name: 'ユーザー',
+            date,
+            start_time: startTime,
+            end_time: endTime,
+            status: '提出済み'
+          })
+        })
+        setDate('')
+        setStartTime('')
+        setEndTime('')
+        fetchShifts()
+      } catch (error) {
+        console.error('Error adding shift:', error)
+      }
     }
   }
 
@@ -96,8 +127,8 @@ function ShiftManagement() {
           {shifts.map((shift, index) => (
             <tr key={index}>
               <td>{shift.date}</td>
-              <td>{shift.startTime}</td>
-              <td>{shift.endTime}</td>
+              <td>{shift.start_time}</td>
+              <td>{shift.end_time}</td>
               <td>{shift.status}</td>
             </tr>
           ))}
@@ -112,25 +143,65 @@ function AttendanceManagement() {
   const [clockedIn, setClockedIn] = useState(false)
   const [currentEntry, setCurrentEntry] = useState<any>(null)
 
-  const clockIn = () => {
-    const now = new Date()
-    setCurrentEntry({
-      date: now.toLocaleDateString('ja-JP'),
-      clockIn: now.toLocaleTimeString('ja-JP'),
-      clockOut: null
-    })
-    setClockedIn(true)
+  useEffect(() => {
+    fetchAttendance()
+  }, [])
+
+  const fetchAttendance = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/attendance`)
+      const data = await response.json()
+      setAttendance(data)
+    } catch (error) {
+      console.error('Error fetching attendance:', error)
+    }
   }
 
-  const clockOut = () => {
+  const clockIn = async () => {
     const now = new Date()
-    const entry = {
-      ...currentEntry,
-      clockOut: now.toLocaleTimeString('ja-JP')
+    const clockInTime = now.toLocaleTimeString('ja-JP')
+
+    try {
+      const response = await fetch(`${API_BASE}/attendance?action=clock-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_name: 'ユーザー',
+          date: now.toLocaleDateString('ja-JP'),
+          clock_in: clockInTime
+        })
+      })
+      const data = await response.json()
+      setCurrentEntry({
+        id: data.id,
+        date: now.toLocaleDateString('ja-JP'),
+        clockIn: clockInTime,
+        clockOut: null
+      })
+      setClockedIn(true)
+    } catch (error) {
+      console.error('Error clocking in:', error)
     }
-    setAttendance([...attendance, entry])
-    setClockedIn(false)
-    setCurrentEntry(null)
+  }
+
+  const clockOut = async () => {
+    const now = new Date()
+    const clockOutTime = now.toLocaleTimeString('ja-JP')
+
+    try {
+      await fetch(`${API_BASE}/attendance?action=clock-out&id=${currentEntry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clock_out: clockOutTime
+        })
+      })
+      setClockedIn(false)
+      setCurrentEntry(null)
+      fetchAttendance()
+    } catch (error) {
+      console.error('Error clocking out:', error)
+    }
   }
 
   return (
@@ -151,14 +222,16 @@ function AttendanceManagement() {
             <th>日付</th>
             <th>出勤時刻</th>
             <th>退勤時刻</th>
+            <th>勤務時間</th>
           </tr>
         </thead>
         <tbody>
           {attendance.map((record, index) => (
             <tr key={index}>
               <td>{record.date}</td>
-              <td>{record.clockIn}</td>
-              <td>{record.clockOut}</td>
+              <td>{record.clock_in}</td>
+              <td>{record.clock_out || '-'}</td>
+              <td>{record.total_hours ? `${record.total_hours.toFixed(2)}時間` : '-'}</td>
             </tr>
           ))}
         </tbody>
@@ -172,11 +245,28 @@ function SalaryCalculation() {
   const [hoursWorked, setHoursWorked] = useState('')
   const [totalSalary, setTotalSalary] = useState<number | null>(null)
 
-  const calculateSalary = () => {
+  const calculateSalary = async () => {
     const wage = parseFloat(hourlyWage)
     const hours = parseFloat(hoursWorked)
+
     if (!isNaN(wage) && !isNaN(hours)) {
-      setTotalSalary(wage * hours)
+      try {
+        const response = await fetch(`${API_BASE}/salary?action=calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_name: 'ユーザー',
+            month: new Date().toISOString().slice(0, 7),
+            hourly_wage: wage,
+            total_hours: hours
+          })
+        })
+        const data = await response.json()
+        setTotalSalary(data.total_salary)
+      } catch (error) {
+        console.error('Error calculating salary:', error)
+        setTotalSalary(wage * hours)
+      }
     }
   }
 
