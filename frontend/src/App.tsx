@@ -438,11 +438,13 @@ function ShiftManagement() {
   const [locations, setLocations] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
-  const [date, setDate] = useState('')
+  const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [editingShift, setEditingShift] = useState<any>(null)
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
+  const [bulkMode, setBulkMode] = useState(false)
+  const [calendarMonth, setCalendarMonth] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -453,7 +455,95 @@ function ShiftManagement() {
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(monthStr)
+    setCalendarMonth(monthStr)
   }, [])
+
+  // カレンダーの日付を生成
+  const generateCalendarDates = () => {
+    if (!calendarMonth) return []
+
+    const [year, month] = calendarMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const lastDay = new Date(year, month, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const dates: (string | null)[] = []
+
+    // 月の最初の曜日まで空白を追加
+    for (let i = 0; i < startDayOfWeek; i++) {
+      dates.push(null)
+    }
+
+    // 日付を追加
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      dates.push(dateStr)
+    }
+
+    return dates
+  }
+
+  const toggleDateSelection = (date: string) => {
+    if (selectedDates.includes(date)) {
+      setSelectedDates(selectedDates.filter(d => d !== date))
+    } else {
+      setSelectedDates([...selectedDates, date])
+    }
+  }
+
+  const selectWeekdays = () => {
+    if (!calendarMonth) return
+    const [year, month] = calendarMonth.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate()
+    const weekdayDates: string[] = []
+
+    for (let day = 1; day <= lastDay; day++) {
+      const date = new Date(year, month - 1, day)
+      const dayOfWeek = date.getDay()
+      // 月曜日から金曜日 (1-5)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        weekdayDates.push(dateStr)
+      }
+    }
+    setSelectedDates(weekdayDates)
+  }
+
+  const selectWeekends = () => {
+    if (!calendarMonth) return
+    const [year, month] = calendarMonth.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate()
+    const weekendDates: string[] = []
+
+    for (let day = 1; day <= lastDay; day++) {
+      const date = new Date(year, month - 1, day)
+      const dayOfWeek = date.getDay()
+      // 土曜日と日曜日 (0, 6)
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        weekendDates.push(dateStr)
+      }
+    }
+    setSelectedDates(weekendDates)
+  }
+
+  const selectAllDates = () => {
+    if (!calendarMonth) return
+    const [year, month] = calendarMonth.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate()
+    const allDates: string[] = []
+
+    for (let day = 1; day <= lastDay; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      allDates.push(dateStr)
+    }
+    setSelectedDates(allDates)
+  }
+
+  const clearDates = () => {
+    setSelectedDates([])
+  }
 
   const loadShifts = () => {
     const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
@@ -481,17 +571,22 @@ function ShiftManagement() {
     setShifts(data)
   }
 
-  const addShift = () => {
-    if (!selectedMember || !selectedLocation || !date) {
-      alert('メンバー、勤務地、日付を入力してください')
+  const addBulkShifts = () => {
+    if (!selectedMember || !selectedLocation) {
+      alert('メンバーと勤務地を選択してください')
+      return
+    }
+
+    if (selectedDates.length === 0) {
+      alert('日付を選択してください')
       return
     }
 
     const member = members.find(m => m.id === Number(selectedMember))
     const location = locations.find(l => l.id === Number(selectedLocation))
 
-    const newShift = {
-      id: Date.now(),
+    const newShifts = selectedDates.map((date, index) => ({
+      id: Date.now() + index,
       member_id: member.id,
       member_name: member.name,
       location_id: location.id,
@@ -501,15 +596,15 @@ function ShiftManagement() {
       end_time: null,
       status: '提出済み',
       created_at: new Date().toISOString()
-    }
+    }))
 
-    const updated = [...shifts, newShift]
+    const updated = [...shifts, ...newShifts]
     saveShifts(updated)
 
     setSelectedMember('')
     setSelectedLocation('')
-    setDate('')
-    alert('シフトを登録しました')
+    setSelectedDates([])
+    alert(`${selectedDates.length}件のシフトを登録しました`)
   }
 
   const openEditTime = (shift: any) => {
@@ -576,22 +671,26 @@ function ShiftManagement() {
     ? shifts.filter(s => s.date.startsWith(selectedMonth))
     : shifts
 
+  const calendarDates = generateCalendarDates()
+
   return (
     <div className="section">
       <h2>📅 シフト管理</h2>
       <div className="guide-box">
-        <h3>使い方</h3>
+        <h3>✨ プロフェッショナル機能</h3>
         <ol>
-          <li>メンバーと勤務地を選択してください</li>
-          <li>シフトの日付を入力してください</li>
-          <li>「シフト追加」ボタンをクリックして登録</li>
-          <li>一覧の「時間設定」ボタンで開始・終了時間を後から追加できます</li>
-          <li>月を選択してシフトを絞り込み、CSV出力できます</li>
+          <li><strong>メンバーと勤務地を選択</strong></li>
+          <li><strong>カレンダーから複数日付を選択</strong> - クリックで日付を選択/解除</li>
+          <li><strong>便利な一括選択</strong> - 平日のみ、週末のみ、全選択、クリアボタン</li>
+          <li><strong>選択した日付数を確認</strong> - リアルタイムで表示</li>
+          <li><strong>一括登録</strong> - 複数日のシフトを一度に登録</li>
+          <li><strong>時間は後から設定</strong> - 「時間設定」ボタンで個別に追加</li>
         </ol>
-        <p className="note">💡 基本的な勤務時間は後で一括設定できるため、まず日付のみ提出してください</p>
+        <p className="note">💡 カレンダーで複数日付を選択することで、効率的にシフトを一括登録できます</p>
       </div>
 
       <div className="shift-form">
+        <h3>🎯 基本情報</h3>
         <div className="form-row">
           <div className="form-group">
             <label>メンバー <span className="required">*必須</span></label>
@@ -618,19 +717,92 @@ function ShiftManagement() {
               ))}
             </select>
           </div>
+        </div>
+      </div>
 
+      <div className="calendar-container">
+        <div className="calendar-header">
           <div className="form-group">
-            <label>日付 <span className="required">*必須</span></label>
+            <label>📆 カレンダー月を選択</label>
             <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              type="month"
+              value={calendarMonth}
+              onChange={(e) => setCalendarMonth(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="form-actions">
-          <button onClick={addShift} className="submit-btn">➕ シフト追加</button>
+        <div className="calendar-quick-select">
+          <button onClick={selectWeekdays} className="quick-select-btn">
+            📅 平日のみ
+          </button>
+          <button onClick={selectWeekends} className="quick-select-btn">
+            🎉 週末のみ
+          </button>
+          <button onClick={selectAllDates} className="quick-select-btn">
+            ✅ 全選択
+          </button>
+          <button onClick={clearDates} className="quick-select-btn">
+            🗑️ クリア
+          </button>
+        </div>
+
+        <div className="calendar-grid">
+          <div className="calendar-day-header sunday">日</div>
+          <div className="calendar-day-header">月</div>
+          <div className="calendar-day-header">火</div>
+          <div className="calendar-day-header">水</div>
+          <div className="calendar-day-header">木</div>
+          <div className="calendar-day-header">金</div>
+          <div className="calendar-day-header saturday">土</div>
+
+          {calendarDates.map((date, index) => {
+            if (date === null) {
+              return <div key={`empty-${index}`} className="calendar-date empty"></div>
+            }
+
+            const dayOfWeek = new Date(date).getDay()
+            const isSelected = selectedDates.includes(date)
+            const day = parseInt(date.split('-')[2])
+
+            let dayClass = 'calendar-date'
+            if (dayOfWeek === 0) dayClass += ' sunday'
+            if (dayOfWeek === 6) dayClass += ' saturday'
+            if (isSelected) dayClass += ' selected'
+
+            return (
+              <div
+                key={date}
+                className={dayClass}
+                onClick={() => toggleDateSelection(date)}
+                title={date}
+              >
+                {day}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="selection-summary">
+          <h4>選択サマリー</h4>
+          <p>選択日数: <strong>{selectedDates.length}日</strong></p>
+          {selectedDates.length > 0 && (
+            <div className="selected-dates-preview">
+              {selectedDates.sort().slice(0, 10).map(date => (
+                <span key={date} className="date-chip">{date.split('-')[2]}日</span>
+              ))}
+              {selectedDates.length > 10 && <span className="date-chip">+{selectedDates.length - 10}日</span>}
+            </div>
+          )}
+        </div>
+
+        <div className="bulk-submit-section">
+          <button
+            onClick={addBulkShifts}
+            disabled={!selectedMember || !selectedLocation || selectedDates.length === 0}
+          >
+            ➕ {selectedDates.length > 0 ? `${selectedDates.length}日分` : ''}シフトを一括登録
+          </button>
         </div>
       </div>
 
