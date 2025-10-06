@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { ShiftWithMonthlyView } from './components-enhanced'
-import { SimpleMemberManagement } from './member-simple'
+import { SimpleMemberManagement } from './member-simple-local'
 import { LocationWithMemberFees } from './location-with-member-fees'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
