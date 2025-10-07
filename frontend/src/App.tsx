@@ -2344,7 +2344,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
         )}
       </div>
 
-      {/* カード形式のリストビュー */}
+      {/* シンプルなテーブル形式のリストビュー */}
       <div className="shift-table-view">
         <div className="table-view-header">
           <h4>📋 リスト表示（日付順）</h4>
@@ -2358,113 +2358,113 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
         {Object.keys(groupedByDate).length === 0 ? (
           <p className="no-data">シフトが登録されていません</p>
         ) : (
-          <div className="date-grouped-shifts">
-            {Object.keys(groupedByDate).sort().map((date) => {
-              const dateShiftIds = groupedByDate[date].map((s: any) => s.id)
-              const allSelected = dateShiftIds.every((id: number) => selectedShiftsForDelete.includes(id))
-              const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]
-              const dayClass = new Date(date).getDay() === 0 ? 'sunday' : new Date(date).getDay() === 6 ? 'saturday' : 'weekday'
+          <div className="simple-shift-table">
+            <table className="shifts-list-table">
+              <thead>
+                <tr>
+                  <th className="col-checkbox">選択</th>
+                  <th className="col-date">日付</th>
+                  <th className="col-member">メンバー</th>
+                  <th className="col-location">勤務地</th>
+                  <th className="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys(groupedByDate).sort().map((date) => {
+                  const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]
+                  const dayClass = new Date(date).getDay() === 0 ? 'sunday' : new Date(date).getDay() === 6 ? 'saturday' : 'weekday'
 
-              // メンバーごとにグループ化
-              const memberGroups: { [key: string]: any[] } = {}
-              groupedByDate[date]
-                .filter((shift: any) => shift.location_id !== -1)
-                .forEach((shift: any) => {
-                  if (!memberGroups[shift.member_id]) {
-                    memberGroups[shift.member_id] = []
+                  // メンバーごとにグループ化
+                  const memberGroups: { [key: string]: any[] } = {}
+                  groupedByDate[date]
+                    .filter((shift: any) => shift.location_id !== -1)
+                    .forEach((shift: any) => {
+                      if (!memberGroups[shift.member_id]) {
+                        memberGroups[shift.member_id] = []
+                      }
+                      memberGroups[shift.member_id].push(shift)
+                    })
+
+                  // メンバーがいない日付はスキップ
+                  if (Object.keys(memberGroups).length === 0) {
+                    return null
                   }
-                  memberGroups[shift.member_id].push(shift)
-                })
 
-              return (
-                <div key={date} className="date-group-card">
-                  <div className={`date-group-header-card ${dayClass}`}>
-                    <div className="date-header-left">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={() => selectAllShiftsInDate(date)}
-                        className="date-select-checkbox"
-                        title="この日のシフトを全選択"
-                      />
-                      <div className="date-display">
-                        <span className="date-main">{date}</span>
-                        <span className={`day-label ${dayClass}`}>({dayOfWeek})</span>
-                      </div>
-                      <span className="shift-count-badge">{Object.keys(memberGroups).length}名</span>
-                    </div>
-                    <button className="reregister-btn-compact" onClick={() => reregisterFromDate(date)}>
-                      🔄 再登録
-                    </button>
-                  </div>
+                  return Object.entries(memberGroups).map(([memberId, memberShifts]: [string, any], idx: number) => {
+                    const mainShift = memberShifts[0]
+                    const hasOffice = shifts.some(
+                      s => s.date === date &&
+                           s.member_id === Number(memberId) &&
+                           s.location_id === -1
+                    )
 
-                  <div className="member-shift-cards">
-                    {Object.entries(memberGroups).map(([memberId, memberShifts]: [string, any]) => {
-                      const mainShift = memberShifts[0]
-                      const hasOffice = shifts.some(
-                        s => s.date === date &&
-                             s.member_id === Number(memberId) &&
-                             s.location_id === -1
-                      )
+                    const allLocations = [...memberShifts]
+                    if (hasOffice && !mainShift.is_other && mainShift.location_id !== -2) {
+                      allLocations.push({ location_name: 'オフィス出勤', location_id: -1 })
+                    }
 
-                      return (
-                        <div key={memberId} className="member-shift-card">
-                          <div className="member-card-header">
-                            <div className="member-info">
-                              <input
-                                type="checkbox"
-                                checked={memberShifts.every((s: any) => selectedShiftsForDelete.includes(s.id))}
-                                onChange={() => {
-                                  memberShifts.forEach((s: any) => toggleShiftSelection(s.id))
-                                }}
-                                className="member-checkbox"
-                              />
-                              <span className="member-name-large">👤 {mainShift.member_name}</span>
-                            </div>
-                          </div>
-
-                          <div className="shift-locations">
-                            {memberShifts.map((shift: any) => (
-                              <div key={shift.id} className="location-row">
-                                <span className={`location-badge-large ${
-                                  shift.is_other
-                                    ? 'location-other'
-                                    : shift.location_id === -2
-                                    ? 'location-advisor'
-                                    : `location-${shift.location_id % 10}`
-                                }`}>
-                                  {shift.is_other ? '📝' : shift.location_id === -2 ? '💼' : '🏢'} {shift.location_name}
-                                </span>
-                              </div>
+                    return (
+                      <tr key={`${date}-${memberId}`} className={dayClass}>
+                        <td className="col-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={memberShifts.every((s: any) => selectedShiftsForDelete.includes(s.id))}
+                            onChange={() => {
+                              memberShifts.forEach((s: any) => toggleShiftSelection(s.id))
+                            }}
+                          />
+                        </td>
+                        <td className={`col-date ${dayClass}`}>
+                          {idx === 0 && (
+                            <>
+                              <div className="date-text">{date}</div>
+                              <div className={`day-text ${dayClass}`}>({dayOfWeek})</div>
+                            </>
+                          )}
+                        </td>
+                        <td className="col-member">
+                          <span className="member-name">{mainShift.member_name}</span>
+                        </td>
+                        <td className="col-location">
+                          <div className="location-tags">
+                            {allLocations.map((loc: any, i: number) => (
+                              <span
+                                key={i}
+                                className={`location-tag ${
+                                  loc.location_id === -1
+                                    ? 'tag-office'
+                                    : loc.is_other
+                                    ? 'tag-other'
+                                    : loc.location_id === -2
+                                    ? 'tag-advisor'
+                                    : `tag-location-${loc.location_id % 10}`
+                                }`}
+                              >
+                                {loc.location_id === -1 ? '🏢' : loc.is_other ? '📝' : loc.location_id === -2 ? '💼' : '🏢'} {loc.location_name}
+                              </span>
                             ))}
-                            {hasOffice && !mainShift.is_other && mainShift.location_id !== -2 && (
-                              <div className="location-row">
-                                <span className="location-badge-large location-office">
-                                  🏢 オフィス出勤
-                                </span>
-                              </div>
-                            )}
                           </div>
-
-                          <div className="shift-card-actions">
-                            <button className="edit-btn-small" onClick={() => openEditShiftInfo(mainShift)}>
-                              ✏️ 編集
+                        </td>
+                        <td className="col-actions">
+                          <div className="action-buttons">
+                            <button className="btn-edit" onClick={() => openEditShiftInfo(mainShift)} title="編集">
+                              ✏️
                             </button>
-                            <button className="delete-btn-small" onClick={() => {
+                            <button className="btn-delete" onClick={() => {
                               if (confirm(`${mainShift.member_name}さんのこの日のシフトを削除しますか？`)) {
                                 memberShifts.forEach((s: any) => deleteShift(s.id))
                               }
-                            }}>
-                              🗑️ 削除
+                            }} title="削除">
+                              🗑️
                             </button>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
+                        </td>
+                      </tr>
+                    )
+                  })
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
