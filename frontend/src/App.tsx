@@ -2196,6 +2196,45 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     return acc
   }, {})
 
+  // カレンダービュー生成
+  const generateCalendarView = () => {
+    if (!selectedMonth) return []
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1).getDay()
+    const daysInMonth = new Date(year, month, 0).getDate()
+
+    const calendarCells = []
+
+    // 空セルを追加
+    for (let i = 0; i < firstDay; i++) {
+      calendarCells.push({ isEmpty: true })
+    }
+
+    // 各日のセルを追加
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const dayShifts = filteredShifts.filter((s: any) => s.date === dateStr)
+
+      calendarCells.push({
+        date: dateStr,
+        day,
+        dayOfWeek: new Date(dateStr).getDay(),
+        shifts: dayShifts,
+        isEmpty: false
+      })
+    }
+
+    return calendarCells
+  }
+
+  const calendarView = generateCalendarView()
+
+  // 勤務時間編集を開く
+  const openEditTime = (shift: any) => {
+    openEditShiftInfo(shift)
+  }
+
   return (
     <div className="section">
       <h2>📋 シフト一覧{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
