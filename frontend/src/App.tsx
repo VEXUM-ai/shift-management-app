@@ -1641,142 +1641,117 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           👤 {currentMemberName}さんのシフトのみを表示しています
         </div>
       )}
-      <div className="guide-box">
-        <h3>✨ プロフェッショナル機能</h3>
-        <ol>
-          <li><strong>メンバーと勤務地を選択</strong></li>
-          <li><strong>カレンダーから複数日付を選択</strong> - クリックで日付を選択/解除</li>
-          <li><strong>便利な一括選択</strong> - 平日のみ、週末のみ、全選択、クリアボタン</li>
-          <li><strong>選択した日付数を確認</strong> - リアルタイムで表示</li>
-          <li><strong>一括登録</strong> - 複数日のシフトを一度に登録</li>
-          <li><strong>時間は後から設定</strong> - 「時間設定」ボタンで個別に追加</li>
-        </ol>
-        <p className="note">💡 カレンダーで複数日付を選択することで、効率的にシフトを一括登録できます</p>
-      </div>
 
-      <div className="shift-form">
-        <h3>🎯 基本情報</h3>
-        {!selectedMemberId && (
-          <div className="form-row">
-            <div className="form-group">
-              <label>メンバー <span className="required">*必須</span></label>
+      <div className="shift-registration-container">
+        <div className="registration-step">
+          <div className="step-number">1</div>
+          <div className="step-content">
+            <h3>メンバー選択</h3>
+            {!selectedMemberId && (
               <select
+                className="select-large"
                 value={selectedMember}
                 onChange={(e) => setSelectedMember(e.target.value)}
               >
-                <option value="">選択してください</option>
+                <option value="">👤 メンバーを選択</option>
                 {members.map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+            )}
+          </div>
+        </div>
+
+        <div className="registration-step">
+          <div className="step-number">2</div>
+          <div className="step-content">
+            <h3>勤務タイプ</h3>
+            <div className="type-selector">
+              <button
+                className={`type-btn ${memberType === 'resident' && !isOtherSelected ? 'active' : ''}`}
+                onClick={() => {
+                  setMemberType('resident')
+                  setIsOtherSelected(false)
+                }}
+              >
+                <div className="type-icon">👥</div>
+                <div className="type-label">クライアント先常駐</div>
+              </button>
+              <button
+                className={`type-btn ${memberType === 'advisor' ? 'active' : ''}`}
+                onClick={() => {
+                  setMemberType('advisor')
+                  setIsOtherSelected(false)
+                  setSelectedLocations([])
+                  setIncludeOffice(false)
+                }}
+              >
+                <div className="type-icon">💼</div>
+                <div className="type-label">アドバイザー</div>
+              </button>
+              <button
+                className={`type-btn ${isOtherSelected ? 'active' : ''}`}
+                onClick={() => {
+                  setIsOtherSelected(true)
+                  setMemberType('resident')
+                  setSelectedLocations([])
+                }}
+              >
+                <div className="type-icon">📋</div>
+                <div className="type-label">その他活動</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {memberType === 'resident' && !isOtherSelected && (
+          <div className="registration-step">
+            <div className="step-number">3</div>
+            <div className="step-content">
+              <h3>勤務地選択</h3>
+              <div className="location-grid">
+                {locations.map(l => (
+                  <button
+                    key={l.id}
+                    className={`location-card ${selectedLocations.includes(String(l.id)) ? 'selected' : ''}`}
+                    onClick={() => {
+                      if (selectedLocations.includes(String(l.id))) {
+                        setSelectedLocations(selectedLocations.filter(id => id !== String(l.id)))
+                      } else {
+                        setSelectedLocations([...selectedLocations, String(l.id)])
+                      }
+                    }}
+                  >
+                    <div className="location-name">{l.name}</div>
+                    {selectedLocations.includes(String(l.id)) && <div className="check-mark">✓</div>}
+                  </button>
+                ))}
+              </div>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={includeOffice}
+                  onChange={(e) => setIncludeOffice(e.target.checked)}
+                />
+                <span>オフィスにも出勤</span>
+              </label>
+              {selectedLocations.length > 0 && (
+                <div className="selection-count">
+                  ✓ {selectedLocations.length}件の勤務地を選択中
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>人材タイプ <span className="required">*必須</span></label>
-            <select
-              value={memberType}
-              onChange={(e) => {
-                setMemberType(e.target.value as 'resident' | 'advisor')
-                if (e.target.value === 'advisor') {
-                  setSelectedLocations([])
-                  setIncludeOffice(false)
-                  setIsOtherSelected(false)
-                }
-              }}
-            >
-              <option value="resident">👥 常駐人材（クライアント先に常駐）</option>
-              <option value="advisor">💼 アドバイザー（常駐なし）</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={isOtherSelected}
-                onChange={(e) => {
-                  setIsOtherSelected(e.target.checked)
-                  if (e.target.checked) {
-                    setSelectedLocations([])
-                    setMemberType('resident')
-                  } else {
-                    setOtherActivity('')
-                  }
-                }}
-                style={{ width: 'auto', marginRight: '8px' }}
-                disabled={memberType === 'advisor'}
-              />
-              その他の活動（研修・営業・休暇など）
-            </label>
-          </div>
-        </div>
-
-        {!isOtherSelected && memberType === 'resident' ? (
-          <>
-            <div className="form-row">
-              <div className="form-group">
-                <label>クライアント先 <span className="required">*必須（複数選択可）</span></label>
-                <div style={{ border: '2px solid #ddd', borderRadius: '8px', padding: '15px', maxHeight: '300px', overflowY: 'auto' }}>
-                  {locations.length === 0 ? (
-                    <div style={{ color: '#999' }}>クライアント先が登録されていません</div>
-                  ) : (
-                    locations.map(l => (
-                      <div key={l.id} style={{ marginBottom: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedLocations.includes(String(l.id))}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedLocations([...selectedLocations, String(l.id)])
-                              } else {
-                                setSelectedLocations(selectedLocations.filter(id => id !== String(l.id)))
-                              }
-                            }}
-                            style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: '15px' }}>{l.name}</span>
-                        </label>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {selectedLocations.length > 0 && (
-                  <div style={{ marginTop: '10px', color: '#667eea', fontWeight: 'bold' }}>
-                    ✓ {selectedLocations.length}件のクライアント先を選択中
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={includeOffice}
-                    onChange={(e) => setIncludeOffice(e.target.checked)}
-                    style={{ width: 'auto', marginRight: '8px', cursor: 'pointer' }}
-                  />
-                  オフィスにも出勤する
-                </label>
-              </div>
-            </div>
-          </>
-        ) : memberType === 'advisor' && !isOtherSelected ? (
-          <div className="info-text" style={{ margin: '20px 0' }}>
-            💼 アドバイザーは常駐先を選択する必要がありません。日付を選択して登録してください。
-          </div>
-        ) : isOtherSelected ? (
-          <div className="form-row">
-            <div className="form-group">
-              <label>活動内容 <span className="required">*必須</span></label>
+        {isOtherSelected && (
+          <div className="registration-step">
+            <div className="step-number">3</div>
+            <div className="step-content">
+              <h3>活動内容</h3>
               <input
                 type="text"
+                className="input-large"
                 value={otherActivity}
                 onChange={(e) => setOtherActivity(e.target.value)}
                 placeholder="例: 新人研修、営業活動、有給休暇"
@@ -1786,90 +1761,68 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
         )}
       </div>
 
-      <div className="calendar-container">
-        <div className="calendar-header">
-          <div className="form-group">
-            <label>📆 カレンダー月を選択</label>
-            <input
-              type="month"
-              value={calendarMonth}
-              onChange={(e) => setCalendarMonth(e.target.value)}
-            />
+      <div className="registration-step">
+        <div className="step-number">{memberType === 'resident' && !isOtherSelected ? '4' : isOtherSelected ? '4' : '3'}</div>
+        <div className="step-content">
+          <h3>日付選択</h3>
+          <input
+            type="month"
+            className="month-selector"
+            value={calendarMonth}
+            onChange={(e) => setCalendarMonth(e.target.value)}
+          />
+          <div className="quick-actions">
+            <button onClick={selectWeekdays} className="quick-btn">📅 平日</button>
+            <button onClick={selectWeekends} className="quick-btn">🎉 週末</button>
+            <button onClick={selectAllDates} className="quick-btn">✅ 全選択</button>
+            <button onClick={clearDates} className="quick-btn">🗑️ クリア</button>
           </div>
-        </div>
-
-        <div className="calendar-quick-select">
-          <button onClick={selectWeekdays} className="quick-select-btn">
-            📅 平日のみ
-          </button>
-          <button onClick={selectWeekends} className="quick-select-btn">
-            🎉 週末のみ
-          </button>
-          <button onClick={selectAllDates} className="quick-select-btn">
-            ✅ 全選択
-          </button>
-          <button onClick={clearDates} className="quick-select-btn">
-            🗑️ クリア
-          </button>
-        </div>
-
-        <div className="calendar-grid">
-          <div className="calendar-day-header sunday">日</div>
-          <div className="calendar-day-header">月</div>
-          <div className="calendar-day-header">火</div>
-          <div className="calendar-day-header">水</div>
-          <div className="calendar-day-header">木</div>
-          <div className="calendar-day-header">金</div>
-          <div className="calendar-day-header saturday">土</div>
-
-          {calendarDates.map((date, index) => {
-            if (date === null) {
-              return <div key={`empty-${index}`} className="calendar-date empty"></div>
-            }
-
-            const dayOfWeek = new Date(date).getDay()
-            const isSelected = selectedDates.includes(date)
-            const day = parseInt(date.split('-')[2])
-
-            let dayClass = 'calendar-date'
-            if (dayOfWeek === 0) dayClass += ' sunday'
-            if (dayOfWeek === 6) dayClass += ' saturday'
-            if (isSelected) dayClass += ' selected'
-
-            return (
-              <div
-                key={date}
-                className={dayClass}
-                onClick={() => toggleDateSelection(date)}
-                title={date}
-              >
-                {day}
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="selection-summary">
-          <h4>選択サマリー</h4>
-          <p>選択日数: <strong>{selectedDates.length}日</strong></p>
+          <div className="calendar-grid">
+            <div className="calendar-day-header sunday">日</div>
+            <div className="calendar-day-header">月</div>
+            <div className="calendar-day-header">火</div>
+            <div className="calendar-day-header">水</div>
+            <div className="calendar-day-header">木</div>
+            <div className="calendar-day-header">金</div>
+            <div className="calendar-day-header saturday">土</div>
+            {calendarDates.map((date, index) => {
+              if (date === null) {
+                return <div key={`empty-${index}`} className="calendar-date empty"></div>
+              }
+              const dayOfWeek = new Date(date).getDay()
+              const isSelected = selectedDates.includes(date)
+              const day = parseInt(date.split('-')[2])
+              let dayClass = 'calendar-date'
+              if (dayOfWeek === 0) dayClass += ' sunday'
+              if (dayOfWeek === 6) dayClass += ' saturday'
+              if (isSelected) dayClass += ' selected'
+              return (
+                <div
+                  key={date}
+                  className={dayClass}
+                  onClick={() => toggleDateSelection(date)}
+                >
+                  {day}
+                </div>
+              )
+            })}
+          </div>
           {selectedDates.length > 0 && (
-            <div className="selected-dates-preview">
-              {selectedDates.sort().slice(0, 10).map(date => (
-                <span key={date} className="date-chip">{date.split('-')[2]}日</span>
-              ))}
-              {selectedDates.length > 10 && <span className="date-chip">+{selectedDates.length - 10}日</span>}
+            <div className="dates-summary">
+              <strong>{selectedDates.length}日</strong> 選択中
             </div>
           )}
         </div>
+      </div>
 
-        <div className="bulk-submit-section">
-          <button
-            onClick={addBulkShifts}
-            disabled={!selectedMember || (!isOtherSelected && !selectedLocation) || (isOtherSelected && !otherActivity) || selectedDates.length === 0}
-          >
-            ➕ {selectedDates.length > 0 ? `${selectedDates.length}日分` : ''}シフトを一括登録
-          </button>
-        </div>
+      <div className="submit-container">
+        <button
+          className="submit-btn"
+          onClick={addBulkShifts}
+          disabled={!selectedMember || (!isOtherSelected && !selectedLocation && memberType === 'resident') || (isOtherSelected && !otherActivity) || selectedDates.length === 0}
+        >
+          ✅ シフトを登録 {selectedDates.length > 0 && `(${selectedDates.length}日分)`}
+        </button>
       </div>
 
       {/* シフト情報編集モーダル */}
