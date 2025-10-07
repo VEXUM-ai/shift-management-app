@@ -35,13 +35,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT') {
-    const { member_transport_fees } = req.body
+    const { name, hourly_wage, type, logo, member_transport_fees } = req.body
     const locations = getLocations()
     const index = locations.findIndex(l => l.id === Number(id))
 
     if (index !== -1) {
       locations[index] = {
         ...locations[index],
+        ...(name !== undefined && { name }),
+        ...(hourly_wage !== undefined && { hourly_wage }),
+        ...(type !== undefined && { type }),
+        ...(logo !== undefined && { logo }),
         member_transport_fees: member_transport_fees || locations[index].member_transport_fees,
         updated_at: new Date().toISOString()
       }

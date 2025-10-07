@@ -10,6 +10,7 @@ export function SimpleLocationManagement() {
   const [type, setType] = useState<'office' | 'client'>('client')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>('')
+  const [editingId, setEditingId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchLocations()
@@ -37,28 +38,58 @@ export function SimpleLocationManagement() {
     }
   }
 
-  const addLocation = async () => {
+  const startEdit = (location: any) => {
+    setEditingId(location.id)
+    setName(location.name)
+    setHourlyWage(location.hourly_wage.toString())
+    setType(location.type)
+    setLogoPreview(location.logo || '')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setName('')
+    setHourlyWage('')
+    setType('client')
+    setLogoFile(null)
+    setLogoPreview('')
+  }
+
+  const addOrUpdateLocation = async () => {
     if (name && hourlyWage) {
       try {
-        await fetch(`${API_BASE}/locations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name,
-            hourly_wage: parseFloat(hourlyWage),
-            type,
-            logo: logoPreview || ''
+        if (editingId) {
+          // 更新
+          await fetch(`${API_BASE}/locations?id=${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              hourly_wage: parseFloat(hourlyWage),
+              type,
+              logo: logoPreview || ''
+            })
           })
-        })
-        setName('')
-        setHourlyWage('')
-        setLogoFile(null)
-        setLogoPreview('')
+          alert('勤務地を更新しました')
+        } else {
+          // 新規追加
+          await fetch(`${API_BASE}/locations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              hourly_wage: parseFloat(hourlyWage),
+              type,
+              logo: logoPreview || ''
+            })
+          })
+          alert('勤務地を追加しました')
+        }
+        cancelEdit()
         fetchLocations()
-        alert('勤務地を追加しました')
       } catch (error) {
-        console.error('Error adding location:', error)
-        alert('追加に失敗しました')
+        console.error('Error saving location:', error)
+        alert('保存に失敗しました')
       }
     } else {
       alert('名前と時給を入力してください')
@@ -110,7 +141,14 @@ export function SimpleLocationManagement() {
           />
           {logoPreview && <img src={logoPreview} alt="Logo preview" className="logo-preview" />}
         </div>
-        <button onClick={addLocation}>追加</button>
+        <button onClick={addOrUpdateLocation}>
+          {editingId ? '更新' : '追加'}
+        </button>
+        {editingId && (
+          <button onClick={cancelEdit} style={{ marginLeft: '10px' }}>
+            キャンセル
+          </button>
+        )}
       </div>
 
       <h3>登録済み勤務地</h3>
@@ -127,7 +165,10 @@ export function SimpleLocationManagement() {
               <h4>{location.name}</h4>
               <p>時給: ¥{location.hourly_wage?.toLocaleString('ja-JP')}</p>
             </div>
-            <button className="delete-btn" onClick={() => deleteLocation(location.id)}>削除</button>
+            <div className="location-actions">
+              <button className="edit-btn" onClick={() => startEdit(location)}>編集</button>
+              <button className="delete-btn" onClick={() => deleteLocation(location.id)}>削除</button>
+            </div>
           </div>
         ))}
       </div>
