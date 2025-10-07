@@ -1550,6 +1550,22 @@ table tfoot {
   font-weight: bold;
   margin-bottom: 2px;
   font-size: 12px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.office-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 10px;
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
 .mini-shift-location {

@@ -2307,33 +2307,52 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                   {hasShifts && <span className="shift-count-badge">{cell.shifts.length}</span>}
                 </div>
                 <div className="cell-shifts">
-                  {cell.shifts.map((shift: any) => {
-                    // クライアント先ごとに色を決定
-                    const colorClass = shift.is_other
-                      ? 'shift-other'
-                      : shift.location_id === -2
-                      ? 'shift-advisor'
-                      : shift.location_id === -1
-                      ? 'shift-office'
-                      : `shift-location-${shift.location_id % 10}`
+                  {(() => {
+                    // 同じ名前のメンバーをグループ化
+                    const groupedByMember = cell.shifts.reduce((acc: any, shift: any) => {
+                      if (!acc[shift.member_name]) {
+                        acc[shift.member_name] = []
+                      }
+                      acc[shift.member_name].push(shift)
+                      return acc
+                    }, {})
 
-                    return (
-                      <div
-                        key={shift.id}
-                        className={`mini-shift-card ${colorClass}`}
-                        onClick={() => openEditTime(shift)}
-                      >
-                        <div className="mini-shift-member">{shift.member_name}</div>
-                        <div className="mini-shift-location">{shift.location_name}</div>
-                        {shift.start_time && shift.end_time && (
-                          <div className="mini-shift-time">
-                            {shift.start_time}-{shift.end_time}
-                            {shift.from_attendance && <span className="attendance-badge">📊</span>}
+                    return Object.entries(groupedByMember).map(([memberName, shifts]: [string, any]) => {
+                      // オフィス出勤があるかチェック
+                      const hasOffice = shifts.some((s: any) => s.location_id === -1)
+                      // 代表的なシフト情報を取得（最初のもの）
+                      const representativeShift = shifts[0]
+
+                      // クライアント先ごとに色を決定
+                      const colorClass = representativeShift.is_other
+                        ? 'shift-other'
+                        : representativeShift.location_id === -2
+                        ? 'shift-advisor'
+                        : representativeShift.location_id === -1
+                        ? 'shift-office'
+                        : `shift-location-${representativeShift.location_id % 10}`
+
+                      return (
+                        <div
+                          key={`${cell.date}-${memberName}`}
+                          className={`mini-shift-card ${colorClass}`}
+                          onClick={() => openEditTime(representativeShift)}
+                        >
+                          <div className="mini-shift-member">
+                            {memberName}
+                            {hasOffice && <span className="office-badge">🏢</span>}
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                          <div className="mini-shift-location">{representativeShift.location_name}</div>
+                          {representativeShift.start_time && representativeShift.end_time && (
+                            <div className="mini-shift-time">
+                              {representativeShift.start_time}-{representativeShift.end_time}
+                              {representativeShift.from_attendance && <span className="attendance-badge">📊</span>}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             )
