@@ -1672,6 +1672,8 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
                 onClick={() => {
                   setMemberType('resident')
                   setIsOtherSelected(false)
+                  setSelectedLocations([])
+                  setIncludeOffice(false)
                 }}
               >
                 <div className="type-icon">👥</div>
