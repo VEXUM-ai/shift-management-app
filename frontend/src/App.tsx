@@ -1704,11 +1704,11 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           </div>
         </div>
 
-        {memberType === 'resident' && !isOtherSelected && (
+        {(memberType === 'resident' || memberType === 'advisor') && !isOtherSelected && (
           <div className="registration-step">
             <div className="step-number">3</div>
             <div className="step-content">
-              <h3>勤務地選択</h3>
+              <h3>{memberType === 'advisor' ? '関係している会社選択' : '勤務地選択'}</h3>
               <div className="location-grid">
                 {locations.map(l => (
                   <button
@@ -1727,17 +1727,19 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
                   </button>
                 ))}
               </div>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={includeOffice}
-                  onChange={(e) => setIncludeOffice(e.target.checked)}
-                />
-                <span>オフィスにも出勤</span>
-              </label>
+              {memberType === 'resident' && (
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeOffice}
+                    onChange={(e) => setIncludeOffice(e.target.checked)}
+                  />
+                  <span>オフィスにも出勤</span>
+                </label>
+              )}
               {selectedLocations.length > 0 && (
                 <div className="selection-count">
-                  ✓ {selectedLocations.length}件の勤務地を選択中
+                  ✓ {selectedLocations.length}件の{memberType === 'advisor' ? '会社' : '勤務地'}を選択中
                 </div>
               )}
             </div>
@@ -1819,7 +1821,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
         <button
           className="submit-btn"
           onClick={addBulkShifts}
-          disabled={!selectedMember || (!isOtherSelected && !selectedLocation && memberType === 'resident') || (isOtherSelected && !otherActivity) || selectedDates.length === 0}
+          disabled={!selectedMember || (!isOtherSelected && selectedLocations.length === 0 && (memberType === 'resident' || memberType === 'advisor')) || (isOtherSelected && !otherActivity) || selectedDates.length === 0}
         >
           ✅ シフトを登録 {selectedDates.length > 0 && `(${selectedDates.length}日分)`}
         </button>
