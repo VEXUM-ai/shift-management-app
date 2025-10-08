@@ -1,0 +1,444 @@
+/* コンポーネント共通スタイル - 最適化版 */
+
+/* ローディングスピナー */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  min-height: 200px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* エラーメッセージ */
+.error-message {
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  color: #c33;
+}
+
+.error-message p {
+  margin: 0 0 12px 0;
+}
+
+.retry-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.retry-btn:hover {
+  background-color: #c0392b;
+}
+
+/* セクション */
+.section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section h2 {
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 24px;
+}
+
+.section h3 {
+  margin: 24px 0 16px 0;
+  color: #34495e;
+  font-size: 18px;
+}
+
+/* フォーム */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.form input,
+.form select,
+.form textarea {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form input:focus,
+.form select:focus,
+.form textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form button {
+  padding: 12px 24px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.form button:hover:not(:disabled) {
+  background-color: #2980b9;
+  transform: translateY(-1px);
+}
+
+.form button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.form button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ファイルアップロード */
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-upload label {
+  font-weight: 600;
+  color: #555;
+  font-size: 14px;
+}
+
+.file-upload input[type="file"] {
+  padding: 8px;
+  font-size: 14px;
+}
+
+.logo-preview {
+  max-width: 200px;
+  max-height: 100px;
+  object-fit: contain;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  background: white;
+}
+
+/* 常駐先グリッド */
+.locations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.location-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fafafa;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.location-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.location-logo {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.location-logo img {
+  max-width: 100%;
+  max-height: 80px;
+  object-fit: contain;
+}
+
+.location-type {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #3498db;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.location-info h4 {
+  margin: 8px 0;
+  color: #2c3e50;
+  font-size: 18px;
+}
+
+.location-info p {
+  margin: 4px 0;
+  color: #555;
+  font-size: 14px;
+}
+
+.delete-btn {
+  margin-top: auto;
+  padding: 8px 16px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+.delete-btn:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+/* シフト一括登録フォーム */
+.bulk-shift-form {
+  margin-bottom: 24px;
+}
+
+.shift-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 1.2fr 1fr 1fr 1fr 0.5fr;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.shift-row select,
+.shift-row input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bulk-actions button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-actions button:first-child {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.bulk-actions button:first-child:hover:not(:disabled) {
+  background-color: #7f8c8d;
+}
+
+.submit-btn {
+  background-color: #27ae60 !important;
+  color: white;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #229954 !important;
+}
+
+/* 月選択 */
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.month-selector label {
+  font-weight: 600;
+  color: #555;
+}
+
+.month-selector input[type="month"] {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.month-selector button {
+  padding: 8px 16px;
+  background-color: #16a085;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+.month-selector button:hover:not(:disabled) {
+  background-color: #138d75;
+}
+
+.month-selector button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+/* テーブル */
+.shifts-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+thead {
+  background-color: #34495e;
+  color: white;
+}
+
+thead th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.logo-cell {
+  width: 80px;
+  text-align: center;
+}
+
+.table-logo {
+  max-width: 60px;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+.no-logo {
+  color: #999;
+  font-size: 12px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #27ae60;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 16px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .locations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-actions {
+    flex-direction: column;
+  }
+
+  .month-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .shifts-table-wrapper {
+    font-size: 12px;
+  }
+
+  thead th,
+  tbody td {
+    padding: 8px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .section h2 {
+    font-size: 20px;
+  }
+
+  .form button {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+}

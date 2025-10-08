@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
+import { Login } from './components/Login'
+import { hashPassword, verifyPassword, generateSessionToken, isSessionValid } from './utils/auth'
 
 type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'attendance' | 'salary'
 type UserRole = 'admin' | 'member'
+
+interface AuthSession {
+  userId: number
+  userName: string
+  userEmail: string
+  userRole: UserRole
+  token: string
+  timestamp: string
+}
 
 // エラーバウンダリーコンポーネント
 class ErrorBoundary extends React.Component<
@@ -52,21 +63,55 @@ const STORAGE_KEYS = {
   SHIFTS: 'shift_app_shifts',
   ATTENDANCE: 'shift_app_attendance',
   USER_ROLE: 'shift_app_user_role',
-  SELECTED_MEMBER_ID: 'shift_app_selected_member_id'
+  SELECTED_MEMBER_ID: 'shift_app_selected_member_id',
+  AUTH_SESSION: 'shift_app_auth_session'
+}
+
+// LocalStorage ヘルパー関数（エラーハンドリング付き）
+const safeLocalStorageSet = (key: string, value: string): boolean => {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (error) {
+    if (error instanceof Error) {
+      // QuotaExceededError の場合
+      if (error.name === 'QuotaExceededError') {
+        alert('⚠️ ストレージの容量が不足しています。古いデータを削除してください。')
+      } else {
+        alert(`❌ データの保存に失敗しました: ${error.message}`)
+      }
+    } else {
+      alert('❌ データの保存に失敗しました。')
+    }
+    console.error('localStorage.setItem error:', error)
+    return false
+  }
+}
+
+const safeLocalStorageGet = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key)
+    if (item === null) return defaultValue
+    return JSON.parse(item) as T
+  } catch (error) {
+    console.error('localStorage.getItem error:', error)
+    return defaultValue
+  }
 }
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('shift')
   const [userRole, setUserRole] = useState<UserRole>('member')
-  const [isRoleSelected, setIsRoleSelected] = useState(false)
-  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null)
   const [members, setMembers] = useState<any[]>([])
 
+  // セッションチェック
   useEffect(() => {
-    const storedRole = localStorage.getItem(STORAGE_KEYS.USER_ROLE)
-    const storedMemberId = localStorage.getItem(STORAGE_KEYS.SELECTED_MEMBER_ID)
     const storedMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+    const storedSession = localStorage.getItem(STORAGE_KEYS.AUTH_SESSION)
 
+    // メンバーデータを読み込み
     if (storedMembers) {
       try {
         const parsed = JSON.parse(storedMembers)
@@ -77,94 +122,109 @@ function App() {
       }
     }
 
-    if (storedRole && storedMemberId) {
-      setUserRole(storedRole as UserRole)
-      setSelectedMemberId(Number(storedMemberId))
-      setIsRoleSelected(true)
-    } else if (storedRole === 'admin') {
-      setUserRole('admin')
-      setIsRoleSelected(true)
+    // セッションチェック
+    if (storedSession) {
+      try {
+        const session: AuthSession = JSON.parse(storedSession)
+        // セッションが有効かチェック（24時間以内）
+        if (isSessionValid(session.timestamp)) {
+          setAuthSession(session)
+          setUserRole(session.userRole)
+          setIsAuthenticated(true)
+        } else {
+          // セッション期限切れ
+          logout()
+        }
+      } catch (error) {
+        console.error('Error parsing session:', error)
+        logout()
+      }
     }
   }, [])
 
-  const selectRole = (role: UserRole, memberId?: number) => {
-    setUserRole(role)
-    setIsRoleSelected(true)
-    localStorage.setItem(STORAGE_KEYS.USER_ROLE, role)
-    if (memberId) {
-      setSelectedMemberId(memberId)
-      localStorage.setItem(STORAGE_KEYS.SELECTED_MEMBER_ID, String(memberId))
+  // ログイン処理
+  const handleLogin = async (email: string, password: string) => {
+    const member = members.find(m => m.email === email)
+
+    if (!member) {
+      throw new Error('メールアドレスまたはパスワードが正しくありません')
     }
+
+    if (!member.password) {
+      throw new Error('パスワードが設定されていません。管理者にお問い合わせください')
+    }
+
+    // パスワード検証
+    const isValid = await verifyPassword(password, member.password)
+    if (!isValid) {
+      throw new Error('メールアドレスまたはパスワードが正しくありません')
+    }
+
+    // セッション作成
+    const session: AuthSession = {
+      userId: member.id,
+      userName: member.name,
+      userEmail: member.email,
+      userRole: member.is_admin ? 'admin' : 'member',
+      token: generateSessionToken(),
+      timestamp: new Date().toISOString()
+    }
+
+    // 最終ログイン時刻を更新
+    const updatedMembers = members.map(m =>
+      m.id === member.id ? { ...m, last_login: session.timestamp } : m
+    )
+    saveMembers(updatedMembers)
+
+    // セッション保存
+    safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
+    setAuthSession(session)
+    setUserRole(session.userRole)
+    setIsAuthenticated(true)
   }
 
-  const switchRole = () => {
-    setIsRoleSelected(false)
-    setSelectedMemberId(null)
-    localStorage.removeItem(STORAGE_KEYS.USER_ROLE)
-    localStorage.removeItem(STORAGE_KEYS.SELECTED_MEMBER_ID)
+  // 管理者ログイン（パスワード不要）
+  const handleAdminLogin = () => {
+    const session: AuthSession = {
+      userId: 0,
+      userName: '管理者（全体）',
+      userEmail: 'admin@system',
+      userRole: 'admin',
+      token: generateSessionToken(),
+      timestamp: new Date().toISOString()
+    }
+
+    safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
+    setAuthSession(session)
+    setUserRole('admin')
+    setIsAuthenticated(true)
   }
 
-  if (!isRoleSelected) {
-    const adminMembers = members.filter(m => m.is_admin)
+  // ログアウト
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION)
+    setAuthSession(null)
+    setIsAuthenticated(false)
+    setUserRole('member')
+  }
 
+  // ログイン画面
+  if (!isAuthenticated) {
     return (
-      <div className="app">
-        <div className="role-selection">
-          <h1>🔐 ログイン</h1>
-          <p>アクセス権限を選択してください</p>
-          <div className="role-buttons">
-            <button className="role-btn admin-btn" onClick={() => selectRole('admin')}>
-              <span className="role-icon">👔</span>
-              <span className="role-title">管理者（全体）</span>
-              <span className="role-desc">メンバー管理・給与設定・全機能利用可能</span>
-            </button>
-            {adminMembers.length > 0 && (
-              <div style={{ width: '100%', marginTop: '20px' }}>
-                <h3 style={{ textAlign: 'center', marginBottom: '15px', color: '#667eea' }}>
-                  👥 管理権限を持つメンバー
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {adminMembers.map(member => (
-                    <button
-                      key={member.id}
-                      className="role-btn member-btn"
-                      onClick={() => selectRole('admin', member.id)}
-                      style={{ padding: '15px' }}
-                    >
-                      <span className="role-icon">👔</span>
-                      <span className="role-title">{member.name}</span>
-                      <span className="role-desc">個人ページ + 管理機能</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ width: '100%', marginTop: '20px' }}>
-              <h3 style={{ textAlign: 'center', marginBottom: '15px', color: '#764ba2' }}>
-                👤 一般メンバー
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(members || []).filter(m => !m.is_admin).map(member => (
-                  <button
-                    key={member.id}
-                    className="role-btn member-btn"
-                    onClick={() => selectRole('member', member.id)}
-                    style={{ padding: '15px' }}
-                  >
-                    <span className="role-icon">👤</span>
-                    <span className="role-title">{member.name}</span>
-                    <span className="role-desc">シフト提出・勤怠打刻のみ</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ErrorBoundary>
+        <Login
+          onLogin={handleLogin}
+          onAdminLogin={handleAdminLogin}
+          showAdminOption={true}
+        />
+      </ErrorBoundary>
     )
   }
 
-  const currentMember = selectedMemberId ? members.find(m => m.id === selectedMemberId) : null
+  // ログイン済みユーザー情報
+  const currentMember = authSession && authSession.userId > 0
+    ? members.find(m => m.id === authSession.userId)
+    : null
 
   return (
     <div className="app">
@@ -172,18 +232,16 @@ function App() {
         <h1>勤怠・シフト管理システム</h1>
         <div className="user-info">
           <span className="current-role">
-            {currentMember ? (
+            {authSession ? (
               <>
-                {userRole === 'admin' && currentMember.is_admin ? '👔' : '👤'} {currentMember.name}
+                {authSession.userRole === 'admin' ? '👔' : '👤'} {authSession.userName}
               </>
             ) : (
-              <>
-                {userRole === 'admin' ? '👔 管理者（全体）' : '👤 メンバー'}
-              </>
+              '👤 ゲスト'
             )}
           </span>
-          <button className="switch-role-btn" onClick={switchRole}>
-            🔄 切り替え
+          <button className="switch-role-btn" onClick={logout}>
+            🚪 ログアウト
           </button>
         </div>
       </header>
@@ -250,6 +308,8 @@ function MemberManagement() {
   const [members, setMembers] = useState<any[]>([])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [officeTransportFee, setOfficeTransportFee] = useState('')
   const [salaryType, setSalaryType] = useState<'hourly' | 'fixed'>('hourly')
   const [hourlyWage, setHourlyWage] = useState('')
@@ -275,17 +335,28 @@ function MemberManagement() {
   }
 
   const saveMembers = (data: any[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data))
+    if (safeLocalStorageSet(STORAGE_KEYS.MEMBERS, JSON.stringify(data))) {
       setMembers(data)
-    } catch (error) {
-      console.error('Error saving members:', error)
     }
   }
 
-  const addMember = () => {
+  const addMember = async () => {
     if (!name) {
       alert('名前を入力してください')
+      return
+    }
+
+    if (!email) {
+      alert('メールアドレスを入力してください')
+      return
+    }
+
+    // メールアドレスの重複チェック
+    const emailExists = members.some(m =>
+      m.email === email && (!editingMember || m.id !== editingMember.id)
+    )
+    if (emailExists) {
+      alert('このメールアドレスは既に登録されています')
       return
     }
 
@@ -299,6 +370,25 @@ function MemberManagement() {
       return
     }
 
+    // パスワード検証（新規追加時またはパスワード変更時）
+    if (password || confirmPassword) {
+      if (password !== confirmPassword) {
+        alert('パスワードが一致しません')
+        return
+      }
+
+      if (password.length < 6) {
+        alert('パスワードは6文字以上で設定してください')
+        return
+      }
+    }
+
+    // パスワードハッシュ化
+    let hashedPassword = editingMember?.password || ''
+    if (password) {
+      hashedPassword = await hashPassword(password)
+    }
+
     if (editingMember) {
       // 編集モード
       const updated = members.map(m =>
@@ -307,6 +397,7 @@ function MemberManagement() {
               ...m,
               name,
               email,
+              password: hashedPassword,
               office_transport_fee: parseFloat(officeTransportFee || '0'),
               salary_type: salaryType,
               hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
@@ -319,11 +410,17 @@ function MemberManagement() {
       setEditingMember(null)
       alert('メンバー情報を更新しました')
     } else {
-      // 新規追加モード
+      // 新規追加モード - パスワード必須
+      if (!password) {
+        alert('パスワードを設定してください')
+        return
+      }
+
       const newMember = {
         id: Date.now(),
         name,
         email,
+        password: hashedPassword,
         office_transport_fee: parseFloat(officeTransportFee || '0'),
         salary_type: salaryType,
         hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
@@ -339,6 +436,8 @@ function MemberManagement() {
 
     setName('')
     setEmail('')
+    setPassword('')
+    setConfirmPassword('')
     setOfficeTransportFee('')
     setHourlyWage('')
     setFixedSalary('')
@@ -350,6 +449,8 @@ function MemberManagement() {
     setEditingMember(member)
     setName(member.name)
     setEmail(member.email || '')
+    setPassword('')
+    setConfirmPassword('')
     setOfficeTransportFee(String(member.office_transport_fee || ''))
     setSalaryType(member.salary_type)
     setHourlyWage(member.salary_type === 'hourly' ? String(member.hourly_wage || '') : '')
@@ -362,6 +463,8 @@ function MemberManagement() {
     setEditingMember(null)
     setName('')
     setEmail('')
+    setPassword('')
+    setConfirmPassword('')
     setOfficeTransportFee('')
     setHourlyWage('')
     setFixedSalary('')
@@ -482,12 +585,44 @@ function MemberManagement() {
           </div>
 
           <div className="form-group">
-            <label>メールアドレス <span className="optional">任意</span></label>
+            <label>メールアドレス <span className="required">*必須</span></label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="例: yamada@example.com"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>
+              パスワード <span className={editingMember ? "optional" : "required"}>
+                {editingMember ? '空白の場合変更なし' : '*必須'}
+              </span>
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={editingMember ? '変更する場合のみ入力' : '6文字以上'}
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>
+              パスワード確認 <span className={editingMember ? "optional" : "required"}>
+                {editingMember ? '空白の場合変更なし' : '*必須'}
+              </span>
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={editingMember ? '変更する場合のみ入力' : 'パスワードを再入力'}
+              autoComplete="new-password"
             />
           </div>
         </div>
@@ -686,8 +821,9 @@ function LocationManagement() {
   }
 
   const saveLocations = (data: any[]) => {
-    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(data))
-    setLocations(data)
+    if (safeLocalStorageSet(STORAGE_KEYS.LOCATIONS, JSON.stringify(data))) {
+      setLocations(data)
+    }
   }
 
   const addLocation = () => {
@@ -1073,6 +1209,8 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   const [bulkMode, setBulkMode] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState('')
   const [filterMember, setFilterMember] = useState('')
+  const [filterLocation, setFilterLocation] = useState('')
+  const [filterActivityType, setFilterActivityType] = useState('')
   const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
   const [includeOffice, setIncludeOffice] = useState(false)
   const [editingShiftInfo, setEditingShiftInfo] = useState<any>(null)
@@ -1240,8 +1378,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   }
 
   const saveShifts = (data: any[]) => {
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data))
-    setShifts(data)
+    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(data))) {
+      setShifts(data)
+    }
   }
 
   const addBulkShifts = () => {
@@ -2244,8 +2383,9 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   }
 
   const saveShifts = (data: any[]) => {
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data))
-    setShifts(data)
+    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(data))) {
+      setShifts(data)
+    }
   }
 
   const deleteShift = (id: number) => {
@@ -3097,8 +3237,9 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
   }
 
   const saveAttendance = (data: any[]) => {
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data))
-    setAttendance(data)
+    if (safeLocalStorageSet(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data))) {
+      setAttendance(data)
+    }
   }
 
   const clockIn = () => {
@@ -3138,13 +3279,21 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
     const now = new Date()
     const clockOutTime = now.toTimeString().slice(0, 5)
 
-    const clockInDate = new Date(`2000-01-01 ${currentEntry.clock_in}`)
-    const clockOutDate = new Date(`2000-01-01 ${clockOutTime}`)
-    const totalHours = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60)
+    // 実際の日付を使用して計算（深夜を跨ぐシフトに対応）
+    const baseDate = currentEntry.date || now.toISOString().slice(0, 10)
+    const clockInDate = new Date(`${baseDate} ${currentEntry.clock_in}`)
+    let clockOutDate = new Date(`${baseDate} ${clockOutTime}`)
+
+    // 退勤時間が出勤時間より前の場合、翌日と判定
+    if (clockOutDate <= clockInDate) {
+      clockOutDate = new Date(clockOutDate.getTime() + 24 * 60 * 60 * 1000)
+    }
+
+    const totalHours = Math.max(0, (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60))
 
     const updated = attendance.map(a =>
       a.id === currentEntry.id
-        ? { ...a, clock_out: clockOutTime, total_hours: totalHours }
+        ? { ...a, clock_out: clockOutTime, total_hours: parseFloat(totalHours.toFixed(2)) }
         : a
     )
 

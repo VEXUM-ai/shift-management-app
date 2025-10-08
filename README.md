@@ -57,6 +57,24 @@
 
 ## 📦 セットアップ
 
+### ローカル開発環境
+
+```bash
+# プロジェクトのクローン
+git clone <repository-url>
+cd shift-management-app
+
+# フロントエンドの起動
+cd frontend
+npm install
+npm run dev
+
+# 別のターミナルでバックエンド起動（オプション）
+cd backend
+npm install
+npm run dev
+```
+
 ### Vercel環境変数設定
 
 Slack通知を有効にする場合、Vercelで以下の環境変数を設定してください：
@@ -65,14 +83,68 @@ Slack通知を有効にする場合、Vercelで以下の環境変数を設定し
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 ```
 
+## 📚 ドキュメント
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Vercelへのデプロイ手順
+- **[OPTIMIZATION.md](OPTIMIZATION.md)** - 実施した最適化の詳細
+- **[CHANGELOG.md](CHANGELOG.md)** - 変更履歴
+
+## 🗂️ プロジェクト構造
+
+```
+shift-management-app/
+├── api/                    # Vercel Serverless Functions
+│   ├── _storage.ts        # データストレージ管理
+│   ├── members.ts         # メンバーAPI
+│   ├── locations.ts       # 常駐先API
+│   ├── shifts.ts          # シフトAPI
+│   ├── attendance.ts      # 勤怠API
+│   ├── salary.ts          # 給与API
+│   └── slack.ts           # Slack通知API
+├── frontend/
+│   ├── src/
+│   │   ├── components/    # UIコンポーネント
+│   │   ├── hooks/         # カスタムReact Hooks
+│   │   ├── utils/         # ユーティリティ関数
+│   │   ├── types/         # TypeScript型定義
+│   │   ├── styles/        # スタイルシート
+│   │   └── App.tsx        # メインアプリ
+│   └── package.json
+├── vercel.json            # Vercel設定
+└── README.md
+```
+
 ## 📝 主要な改善点
 
 ### ✨ 最新の追加機能
-- **ロゴ画像アップロード**: 常駐先ごとに会社ロゴを設定可能
+- **ロゴ画像アップロード**: 常駐先ごとに会社ロゴを設定可能（5MB制限）
 - **月別シフト表示**: 月ごとにシフトを整理して表示
 - **交通費管理**: オフィス/常駐先で交通費を分けて管理
 - **CSV出力**: 月別のシフトデータをCSV形式でエクスポート
 - **Slack通知**: シフト登録時に自動通知
+
+### 🔧 最適化と品質向上
+- **型安全性の強化**: TypeScriptの厳密な型定義を全体に適用
+- **エラーハンドリング**:
+  - APIレスポンスの詳細なバリデーション
+  - ユーザーフレンドリーなエラーメッセージ表示
+  - フロントエンドでのエラー状態管理
+- **パフォーマンス最適化**:
+  - `useCallback`、`useMemo`による再レンダリング防止
+  - 並列API呼び出しによる一括登録の高速化
+  - データフィルタリングのメモ化
+- **バリデーション強化**:
+  - 入力データの形式チェック（日付、時間、メール等）
+  - 重複データの防止
+  - 論理的整合性の検証（終了時間 > 開始時間等）
+- **セキュリティ対策**:
+  - XSS対策のための入力サニタイゼーション
+  - ファイルサイズ制限による過負荷防止
+  - HTTPステータスコードの適切な使用
+- **UIの改善**:
+  - ローディング状態の可視化
+  - エラーメッセージの明確な表示
+  - 無効状態の適切な管理
 
 ## 📄 ライセンス
 

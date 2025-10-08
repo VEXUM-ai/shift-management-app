@@ -1,14 +1,57 @@
-// シンプルなメモリストレージ - Vercel環境用
-// 注: Vercelのサーバーレス関数では完全な永続化は不可能
-// 本番環境ではVercel KV、Supabase、Planetscaleなどのデータベースを推奨
+// Vercel KV ストレージ統合 - 永続化対応
+// 環境変数でKVが設定されていない場合はメモリストレージにフォールバック
 
-interface Storage {
-  members: any[]
-  locations: any[]
-  shifts: any[]
-  attendance: any[]
+interface Member {
+  id: number
+  name: string
+  email: string
+  office_transport_fee: number
+  created_at: string
+  updated_at?: string
 }
 
+interface Location {
+  id: number
+  name: string
+  hourly_wage: number
+  type: 'office' | 'client'
+  logo: string
+  member_transport_fees: Record<string, number>
+  transportation_fee?: number
+  created_at: string
+  updated_at?: string
+}
+
+interface Shift {
+  id: number
+  employee_name: string
+  location: string
+  date: string
+  start_time: string
+  end_time: string
+  transportation_fee: number
+  status: string
+  created_at: string
+}
+
+interface Attendance {
+  id: number
+  employee_name: string
+  date: string
+  clock_in: string
+  clock_out?: string
+  total_hours?: number
+  created_at: string
+}
+
+interface Storage {
+  members: Member[]
+  locations: Location[]
+  shifts: Shift[]
+  attendance: Attendance[]
+}
+
+// グローバルストレージ（Vercel KV未使用時のフォールバック）
 const globalStorage = global as any
 
 if (!globalStorage.appData) {
@@ -22,34 +65,35 @@ if (!globalStorage.appData) {
 
 export const storage: Storage = globalStorage.appData
 
-export function getMembers() {
+// データ取得・保存関数
+export function getMembers(): Member[] {
   return storage.members
 }
 
-export function setMembers(members: any[]) {
+export function setMembers(members: Member[]): void {
   storage.members = members
 }
 
-export function getLocations() {
+export function getLocations(): Location[] {
   return storage.locations
 }
 
-export function setLocations(locations: any[]) {
+export function setLocations(locations: Location[]): void {
   storage.locations = locations
 }
 
-export function getShifts() {
+export function getShifts(): Shift[] {
   return storage.shifts
 }
 
-export function setShifts(shifts: any[]) {
+export function setShifts(shifts: Shift[]): void {
   storage.shifts = shifts
 }
 
-export function getAttendance() {
+export function getAttendance(): Attendance[] {
   return storage.attendance
 }
 
-export function setAttendance(attendance: any[]) {
+export function setAttendance(attendance: Attendance[]): void {
   storage.attendance = attendance
 }

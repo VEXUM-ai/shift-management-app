@@ -1,0 +1,14 @@
+{
+  "name": "shift-management-api",
+  "version": "1.0.0",
+  "description": "API endpoints for shift management application",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  }
+}

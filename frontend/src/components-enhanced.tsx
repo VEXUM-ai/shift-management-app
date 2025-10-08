@@ -1,83 +1,170 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+
+// 型定義
+interface Location {
+  id: number
+  name: string
+  hourly_wage: number
+  type: 'office' | 'client'
+  logo: string
+  transportation_fee?: number
+  member_transport_fees?: Record<string, number>
+}
+
+interface Member {
+  id: number
+  name: string
+  email: string
+  office_transport_fee: number
+}
+
+interface Shift {
+  id: number
+  employee_name: string
+  location: string
+  date: string
+  start_time: string
+  end_time: string
+  transportation_fee: number
+  status: string
+}
+
+interface BulkShiftRow {
+  date: string
+  startTime: string
+  endTime: string
+  member: string
+  location: string
+  transportationFee: string
+}
 
 const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3000/api'
 
+// エラーハンドリングユーティリティ
+async function handleApiError(response: Response) {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'エラーが発生しました' }))
+    throw new Error(errorData.error || `HTTPエラー: ${response.status}`)
+  }
+  return response.json()
+}
+
 // 常駐先管理 - ロゴアップロード対応
 export function LocationWithLogo() {
-  const [locations, setLocations] = useState<any[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [name, setName] = useState('')
   const [hourlyWage, setHourlyWage] = useState('')
   const [transportationFee, setTransportationFee] = useState('')
   const [type, setType] = useState<'office' | 'client'>('client')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchLocations()
   }, [])
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
+      setError(null)
       const response = await fetch(`${API_BASE}/locations`)
-      const data = await response.json()
-      setLocations(data)
+      const data = await handleApiError(response)
+      setLocations(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching locations:', error)
+      setError(error instanceof Error ? error.message : '常駐先の取得に失敗しました')
     }
-  }
+  }, [])
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      // ファイルサイズチェック (5MB制限)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('ファイルサイズは5MB以下にしてください')
+        return
+      }
+
       setLogoFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
         setLogoPreview(reader.result as string)
       }
+      reader.onerror = () => {
+        alert('画像の読み込みに失敗しました')
+      }
       reader.readAsDataURL(file)
     }
-  }
+  }, [])
 
-  const addLocation = async () => {
-    if (name && hourlyWage) {
-      try {
-        await fetch(`${API_BASE}/locations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name,
-            hourly_wage: parseFloat(hourlyWage),
-            transportation_fee: type === 'client' ? parseFloat(transportationFee || '0') : 0,
-            type,
-            logo: logoPreview || ''
-          })
+  const addLocation = useCallback(async () => {
+    if (!name.trim()) {
+      alert('常駐先名を入力してください')
+      return
+    }
+    if (!hourlyWage || parseFloat(hourlyWage) <= 0) {
+      alert('有効な時給を入力してください')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`${API_BASE}/locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          hourly_wage: parseFloat(hourlyWage),
+          transportation_fee: type === 'client' ? parseFloat(transportationFee || '0') : 0,
+          type,
+          logo: logoPreview || ''
         })
-        setName('')
-        setHourlyWage('')
-        setTransportationFee('')
-        setLogoFile(null)
-        setLogoPreview('')
-        fetchLocations()
-      } catch (error) {
-        console.error('Error adding location:', error)
-      }
-    }
-  }
+      })
+      await handleApiError(response)
 
-  const deleteLocation = async (id: number) => {
-    if (confirm('この勤務地を削除しますか？')) {
-      try {
-        await fetch(`${API_BASE}/locations?id=${id}`, { method: 'DELETE' })
-        fetchLocations()
-      } catch (error) {
-        console.error('Error deleting location:', error)
-      }
+      setName('')
+      setHourlyWage('')
+      setTransportationFee('')
+      setLogoFile(null)
+      setLogoPreview('')
+      await fetchLocations()
+      alert('常駐先を追加しました')
+    } catch (error) {
+      console.error('Error adding location:', error)
+      setError(error instanceof Error ? error.message : '常駐先の追加に失敗しました')
+      alert(error instanceof Error ? error.message : '常駐先の追加に失敗しました')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [name, hourlyWage, transportationFee, type, logoPreview, fetchLocations])
+
+  const deleteLocation = useCallback(async (id: number) => {
+    if (!confirm('この勤務地を削除しますか？')) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`${API_BASE}/locations?id=${id}`, { method: 'DELETE' })
+      await handleApiError(response)
+      await fetchLocations()
+      alert('常駐先を削除しました')
+    } catch (error) {
+      console.error('Error deleting location:', error)
+      setError(error instanceof Error ? error.message : '常駐先の削除に失敗しました')
+      alert(error instanceof Error ? error.message : '常駐先の削除に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchLocations])
 
   return (
     <div className="section">
       <h2>常駐先・勤務地登録</h2>
+      {error && <div className="error-message">{error}</div>}
       <div className="form">
         <select value={type} onChange={(e) => setType(e.target.value as 'office' | 'client')}>
           <option value="office">オフィス</option>
@@ -113,7 +200,9 @@ export function LocationWithLogo() {
           />
           {logoPreview && <img src={logoPreview} alt="Logo preview" className="logo-preview" />}
         </div>
-        <button onClick={addLocation}>追加</button>
+        <button onClick={addLocation} disabled={loading}>
+          {loading ? '処理中...' : '追加'}
+        </button>
       </div>
 
       <h3>登録済み勤務地</h3>
@@ -143,13 +232,15 @@ export function LocationWithLogo() {
 
 // シフト管理 - 月ごと表示・ロゴ表示対応
 export function ShiftWithMonthlyView() {
-  const [shifts, setShifts] = useState<any[]>([])
-  const [members, setMembers] = useState<any[]>([])
-  const [locations, setLocations] = useState<any[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
+  const [members, setMembers] = useState<Member[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
-  const [bulkShifts, setBulkShifts] = useState<any[]>([
+  const [bulkShifts, setBulkShifts] = useState<BulkShiftRow[]>([
     { date: '', startTime: '', endTime: '', member: '', location: '', transportationFee: '' }
   ])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchShifts()
@@ -157,35 +248,37 @@ export function ShiftWithMonthlyView() {
     fetchLocations()
   }, [])
 
-  const fetchShifts = async () => {
+  const fetchShifts = useCallback(async () => {
     try {
+      setError(null)
       const response = await fetch(`${API_BASE}/shifts`)
-      const data = await response.json()
-      setShifts(data)
+      const data = await handleApiError(response)
+      setShifts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching shifts:', error)
+      setError(error instanceof Error ? error.message : 'シフトの取得に失敗しました')
     }
-  }
+  }, [])
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/members`)
-      const data = await response.json()
-      setMembers(data)
+      const data = await handleApiError(response)
+      setMembers(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching members:', error)
     }
-  }
+  }, [])
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/locations`)
-      const data = await response.json()
-      setLocations(data)
+      const data = await handleApiError(response)
+      setLocations(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching locations:', error)
     }
-  }
+  }, [])
 
   const addShiftRow = () => {
     setBulkShifts([...bulkShifts, { date: '', startTime: '', endTime: '', member: '', location: '', transportationFee: '' }])
@@ -211,7 +304,7 @@ export function ShiftWithMonthlyView() {
     setBulkShifts(updated)
   }
 
-  const submitBulkShifts = async () => {
+  const submitBulkShifts = useCallback(async () => {
     const validShifts = bulkShifts.filter(s => s.date && s.startTime && s.endTime && s.member && s.location)
 
     if (validShifts.length === 0) {
@@ -219,35 +312,60 @@ export function ShiftWithMonthlyView() {
       return
     }
 
+    setLoading(true)
+    setError(null)
+
     try {
-      for (const shift of validShifts) {
-        await fetch(`${API_BASE}/shifts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employee_name: shift.member,
-            location: shift.location,
-            date: shift.date,
-            start_time: shift.startTime,
-            end_time: shift.endTime,
-            transportation_fee: parseFloat(shift.transportationFee || '0'),
-            status: '提出済み'
-          })
-        })
+      const errors: string[] = []
+
+      // 並列リクエストで登録（パフォーマンス向上）
+      const results = await Promise.allSettled(
+        validShifts.map(shift =>
+          fetch(`${API_BASE}/shifts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              employee_name: shift.member,
+              location: shift.location,
+              date: shift.date,
+              start_time: shift.startTime,
+              end_time: shift.endTime,
+              transportation_fee: parseFloat(shift.transportationFee || '0'),
+              status: '提出済み'
+            })
+          }).then(handleApiError)
+        )
+      )
+
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          errors.push(`${validShifts[index].date} ${validShifts[index].member}: ${result.reason}`)
+        }
+      })
+
+      if (errors.length > 0) {
+        alert(`一部のシフト登録に失敗しました:\n${errors.join('\n')}`)
       }
 
-      // Slack通知
-      const message = `【シフト登録通知】\n${validShifts.length}件のシフトが登録されました\n${validShifts.map(s => `・${s.date} ${s.member} @ ${s.location}`).join('\n')}`
-      await sendSlackNotification(message)
+      const successCount = results.filter(r => r.status === 'fulfilled').length
 
-      setBulkShifts([{ date: '', startTime: '', endTime: '', member: '', location: '', transportationFee: '' }])
-      fetchShifts()
-      alert(`${validShifts.length}件のシフトを登録しました`)
+      if (successCount > 0) {
+        // Slack通知
+        const message = `【シフト登録通知】\n${successCount}件のシフトが登録されました\n${validShifts.slice(0, successCount).map(s => `・${s.date} ${s.member} @ ${s.location}`).join('\n')}`
+        await sendSlackNotification(message)
+
+        setBulkShifts([{ date: '', startTime: '', endTime: '', member: '', location: '', transportationFee: '' }])
+        await fetchShifts()
+        alert(`${successCount}件のシフトを登録しました${errors.length > 0 ? `（${errors.length}件失敗）` : ''}`)
+      }
     } catch (error) {
       console.error('Error submitting shifts:', error)
-      alert('シフト登録に失敗しました')
+      setError(error instanceof Error ? error.message : 'シフト登録に失敗しました')
+      alert(error instanceof Error ? error.message : 'シフト登録に失敗しました')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [bulkShifts, fetchShifts])
 
   const sendSlackNotification = async (message: string) => {
     try {
@@ -292,17 +410,21 @@ export function ShiftWithMonthlyView() {
     link.click()
   }
 
-  const getLocationLogo = (locationName: string) => {
+  const getLocationLogo = useCallback((locationName: string) => {
     const location = locations.find(l => l.name === locationName)
     return location?.logo
-  }
+  }, [locations])
 
-  // 月ごとにグループ化
-  const monthlyShifts = shifts.filter(s => s.date.startsWith(selectedMonth))
+  // 月ごとにグループ化（useMemoでパフォーマンス最適化）
+  const monthlyShifts = useMemo(
+    () => shifts.filter(s => s.date && s.date.startsWith(selectedMonth)),
+    [shifts, selectedMonth]
+  )
 
   return (
     <div className="section">
       <h2>シフト一括登録</h2>
+      {error && <div className="error-message">{error}</div>}
       <div className="bulk-shift-form">
         {bulkShifts.map((shift, index) => (
           <div key={index} className="shift-row">
@@ -353,8 +475,10 @@ export function ShiftWithMonthlyView() {
           </div>
         ))}
         <div className="bulk-actions">
-          <button onClick={addShiftRow}>行追加</button>
-          <button className="submit-btn" onClick={submitBulkShifts}>一括登録</button>
+          <button onClick={addShiftRow} disabled={loading}>行追加</button>
+          <button className="submit-btn" onClick={submitBulkShifts} disabled={loading}>
+            {loading ? '登録中...' : '一括登録'}
+          </button>
         </div>
       </div>
 
