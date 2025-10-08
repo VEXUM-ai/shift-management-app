@@ -1,168 +1,48 @@
-# 変更履歴
+# Changelog
 
-## [2.0.0] - 2025年版 - 最適化と品質向上
+All notable changes to this project are documented in this file.
 
-### 🎯 主要な改善点
+## [2.0.0] - 2025-10-08
 
-#### 型安全性の強化
-- **TypeScriptの厳密な型定義**
-  - すべてのデータモデル（Location, Member, Shift, Attendance）に明示的な型定義を追加
-  - `any`型の使用を最小限に抑え、型推論を活用
-  - APIレスポンスの型安全性を保証
+### Highlights
+- Hardened TypeScript typing across API responses and shared models.
+- Added comprehensive validation and error messaging for members, locations,
+  shifts, attendance, and salary endpoints.
+- Improved frontend resiliency with loading states, error surfacing, and
+  reusable helpers.
+- Optimised performance through memoisation, parallel API requests, and tighter
+  filtering logic.
+- Expanded security with password hashing, session timeouts, input sanitation,
+  and file-size enforcement.
 
-#### エラーハンドリングの改善
-- **API層のバリデーション**
-  - `members.ts`: メンバー名、メールアドレス、交通費のバリデーション
-  - `locations.ts`: 常駐先名、時給、タイプ、交通費のバリデーション
-  - `shifts.ts`: 日付・時間形式、論理的整合性のチェック
-  - `attendance.ts`: 出退勤時間のバリデーション、重複チェック
+### API & Backend
+- Introduced `validate*` helpers for every serverless route with consistent HTTP
+  status codes.
+- Enhanced `_storage.ts` typing and return value annotations.
+- Added duplicate detection, time validation, and richer error payloads for
+  `members.ts`, `locations.ts`, `shifts.ts`, and `attendance.ts`.
+- Generated salaries now round to two decimal places and report validation
+  failures explicitly.
 
-- **フロントエンドのエラー表示**
-  - エラーメッセージの明確な表示
-  - ローディング状態の可視化
-  - ユーザーフレンドリーなエラー通知
+### Frontend
+- Reworked enhanced components with explicit interfaces for `Location`, `Member`
+  and shift rows.
+- Added `handleApiError` utility, memoised selectors, and upload validation for
+  logo files (size limits, MIME checks).
+- Centralised loading and disabled states for bulk actions and form submission.
 
-#### パフォーマンス最適化
-- **React Hooks の活用**
-  - `useCallback`: 関数のメモ化で不要な再レンダリングを防止
-  - `useMemo`: 計算結果のキャッシュで処理の高速化
-  - 月別シフトフィルタリングの最適化
+### Configuration & Tooling
+- Documented Vercel build output and rewrites in `vercel.json`.
+- Added dedicated `api/package.json` to capture serverless build dependencies.
+- Expanded documentation (deployment, optimisation, authentication, UI/UX) to
+  support onboarding and operations.
 
-- **並列処理の実装**
-  - `Promise.allSettled`による一括シフト登録の並列化
-  - エラーハンドリングを保ちつつ高速化を実現
-  - 成功・失敗の詳細レポート機能
+### Fixes
+- Prevented invalid monthly filters and duplicate shift creation.
+- Corrected working-hour calculations for attendance records.
+- Improved user feedback when bulk operations partially fail.
 
-#### バリデーション強化
-- **入力検証の追加**
-  - 日付形式: `YYYY-MM-DD`
-  - 時間形式: `HH:MM`
-  - メールアドレス: RFC準拠の正規表現
-  - 数値: 負数チェック、範囲検証
+## [1.0.0] - 2025-09-10
 
-- **論理的整合性のチェック**
-  - 終了時間 > 開始時間
-  - 退勤時間 > 出勤時間
-  - 重複データの防止（同名メンバー、同名常駐先）
-
-#### セキュリティ対策
-- **入力サニタイゼーション**
-  - トリム処理による不要な空白の除去
-  - ファイルサイズ制限（5MB）
-  - 画像ファイル形式の検証
-
-- **HTTPステータスコードの適切な使用**
-  - `200`: 成功
-  - `201`: 新規作成成功
-  - `400`: バリデーションエラー
-  - `404`: リソースが見つからない
-  - `409`: 重複エラー
-  - `500`: サーバーエラー
-
-#### UIの改善
-- **状態管理の強化**
-  - ローディング中のボタン無効化
-  - 処理中の表示（「処理中...」「登録中...」）
-  - エラーメッセージの一貫した表示
-
-- **ユーザビリティの向上**
-  - 入力フィールドのプレースホルダー最適化
-  - バリデーションエラーの即座な表示
-  - 成功・失敗メッセージの明確化
-
-### 📝 API層の変更
-
-#### `api/_storage.ts`
-- インターフェース定義の追加（型安全性）
-- 戻り値の型注釈を明示化
-
-#### `api/members.ts`
-- `validateMemberData`関数の実装
-- エラーハンドリングの強化
-- 重複チェックの追加
-- HTTPステータスコードの適切な使用
-
-#### `api/locations.ts`
-- `validateLocationData`関数の実装
-- タイプチェック（office/client）
-- 重複チェックの追加
-- エラーハンドリングの強化
-
-#### `api/shifts.ts`
-- `validateShiftData`関数の実装
-- 日付・時間形式の厳密な検証
-- 時間の論理チェック
-- ソート機能の追加（日付順）
-
-#### `api/attendance.ts`
-- `validateAttendanceData`関数の実装
-- 出退勤の重複チェック
-- 勤務時間計算の精度向上（小数点2桁）
-- エラーハンドリングの強化
-
-### 🎨 フロントエンドの変更
-
-#### `frontend/src/components-enhanced.tsx`
-- 型定義の追加（Location, Member, Shift, BulkShiftRow）
-- `handleApiError`ユーティリティ関数の実装
-- `useCallback`、`useMemo`による最適化
-- エラー状態とローディング状態の管理
-- 画像ファイルサイズのバリデーション（5MB）
-- 並列API呼び出しの実装
-
-### 📦 設定ファイルの変更
-
-#### `vercel.json`
-- ビルドコマンドの明示化
-- 出力ディレクトリの設定
-- CORSヘッダーの追加
-- リライトルールの整理
-
-#### `api/package.json` (新規作成)
-- @vercel/node の依存関係
-- TypeScript設定
-
-### 📚 ドキュメントの追加
-
-#### `DEPLOYMENT.md` (新規作成)
-- Vercelへのデプロイ手順
-- 環境変数の設定方法
-- ローカル環境でのテスト方法
-- トラブルシューティングガイド
-- セキュリティとパフォーマンスのベストプラクティス
-
-#### `README.md`
-- 最適化内容の追記
-- セキュリティ対策の明記
-- パフォーマンス向上の詳細
-
-### 🐛 バグ修正
-
-- シフト一括登録時のエラーハンドリング改善
-- 月別フィルタリングのnullチェック追加
-- 勤怠時間計算の精度向上
-- 重複データ登録の防止
-
-### 🔄 互換性
-
-- 既存のAPIエンドポイントとの後方互換性を維持
-- データ構造は変更なし
-- 既存の機能はすべて動作
-
----
-
-## [1.0.0] - 初回リリース
-
-### 主要機能
-- メンバー管理
-- 常駐先管理（ロゴアップロード対応）
-- シフト一括登録
-- 月別シフト表示
-- CSV出力
-- 勤怠管理
-- 給与計算
-- Slack通知
-
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+- Initial public release covering member/location management, shift scheduling,
+  attendance tracking, payroll exports, and Slack notifications.

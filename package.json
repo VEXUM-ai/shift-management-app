@@ -1,7 +1,7 @@
 {
   "name": "shift-management-app",
   "version": "1.0.0",
-  "description": "シフト提出・管理、勤怠管理、給与計算アプリ",
+  "description": "Shift scheduling, attendance tracking, and payroll management app",
   "private": true,
   "workspaces": [
     "frontend",
