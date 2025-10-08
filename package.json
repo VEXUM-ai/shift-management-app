@@ -11,7 +11,9 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
-    "build": "npm run build --workspace=frontend && npm run build --workspace=backend"
+    "build": "cd frontend && npm install && npm run build",
+    "build:all": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "vercel-build": "cd frontend && npm install && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
