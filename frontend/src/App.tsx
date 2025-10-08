@@ -1228,7 +1228,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   const [bulkMode, setBulkMode] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState('')
   const [filterMember, setFilterMember] = useState('')
-  const [filterLocation, setFilterLocation] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
   const [filterActivityType, setFilterActivityType] = useState('')
   const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
   const [includeOffice, setIncludeOffice] = useState(false)
@@ -1937,15 +1937,15 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   }
 
   // 勤務地（会社）フィルター適用
-  if (filterLocation) {
-    if (filterLocation === 'office') {
+  if (locationFilter) {
+    if (locationFilter === 'office') {
       filteredShifts = filteredShifts.filter(s => s.location_id === -1)
-    } else if (filterLocation === 'advisor') {
+    } else if (locationFilter === 'advisor') {
       filteredShifts = filteredShifts.filter(s => s.location_id === -2)
-    } else if (filterLocation === 'other') {
+    } else if (locationFilter === 'other') {
       filteredShifts = filteredShifts.filter(s => s.is_other === true)
     } else {
-      filteredShifts = filteredShifts.filter(s => s.location_id === Number(filterLocation))
+      filteredShifts = filteredShifts.filter(s => s.location_id === Number(locationFilter))
     }
   }
 
@@ -2328,7 +2328,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   const [attendance, setAttendance] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [filterMember, setFilterMember] = useState('')
-  const [filterLocation, setFilterLocation] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
   const [filterActivityType, setFilterActivityType] = useState('')
   const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
   const [editingShiftInfo, setEditingShiftInfo] = useState<any>(null)
@@ -2629,15 +2629,15 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   }
 
   // 勤務地（会社）フィルター適用
-  if (filterLocation) {
-    if (filterLocation === 'office') {
+  if (locationFilter) {
+    if (locationFilter === 'office') {
       filteredShifts = filteredShifts.filter(s => s.location_id === -1)
-    } else if (filterLocation === 'advisor') {
+    } else if (locationFilter === 'advisor') {
       filteredShifts = filteredShifts.filter(s => s.location_id === -2)
-    } else if (filterLocation === 'other') {
+    } else if (locationFilter === 'other') {
       filteredShifts = filteredShifts.filter(s => s.is_other === true)
     } else {
-      filteredShifts = filteredShifts.filter(s => s.location_id === Number(filterLocation))
+      filteredShifts = filteredShifts.filter(s => s.location_id === Number(locationFilter))
     }
   }
 
@@ -2754,8 +2754,8 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
           <div className="form-group">
             <label>会社で絞り込み</label>
             <select
-              value={filterLocation}
-              onChange={(e) => setFilterLocation(e.target.value)}
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
             >
               <option value="">全勤務地</option>
               <option value="office">🏢 オフィス</option>
