@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
 import { Login } from './components/Login'
-import { hashPassword, verifyPassword, generateSessionToken, isSessionValid } from './utils/auth'
+import { hashPassword, verifyPassword, isSessionValid } from './utils/auth'
+
+// セッショントークン生成
+const generateSessionToken = (): string => {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
 
 type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'attendance' | 'salary'
 type UserRole = 'admin' | 'member'
@@ -131,15 +138,27 @@ function App() {
           setAuthSession(session)
           setUserRole(session.userRole)
           setIsAuthenticated(true)
-        } else {
-          // セッション期限切れ
-          logout()
+          return
         }
       } catch (error) {
         console.error('Error parsing session:', error)
-        logout()
       }
     }
+
+    // セッションがない場合は自動的に管理者としてログイン
+    const session: AuthSession = {
+      userId: 0,
+      userName: '管理者（全体）',
+      userEmail: 'admin@system',
+      userRole: 'admin',
+      token: generateSessionToken(),
+      timestamp: new Date().toISOString()
+    }
+
+    safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
+    setAuthSession(session)
+    setUserRole('admin')
+    setIsAuthenticated(true)
   }, [])
 
   // ログイン処理
@@ -208,18 +227,18 @@ function App() {
     setUserRole('member')
   }
 
-  // ログイン画面
-  if (!isAuthenticated) {
-    return (
-      <ErrorBoundary>
-        <Login
-          onLogin={handleLogin}
-          onAdminLogin={handleAdminLogin}
-          showAdminOption={true}
-        />
-      </ErrorBoundary>
-    )
-  }
+  // ログイン画面（現在は自動ログイン設定のためコメントアウト）
+  // if (!isAuthenticated) {
+  //   return (
+  //     <ErrorBoundary>
+  //       <Login
+  //         onLogin={handleLogin}
+  //         onAdminLogin={handleAdminLogin}
+  //         showAdminOption={true}
+  //       />
+  //     </ErrorBoundary>
+  //   )
+  // }
 
   // ログイン済みユーザー情報
   const currentMember = authSession && authSession.userId > 0
