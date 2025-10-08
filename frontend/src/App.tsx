@@ -27,7 +27,13 @@ function App() {
     const storedMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS)
 
     if (storedMembers) {
-      setMembers(JSON.parse(storedMembers))
+      try {
+        const parsed = JSON.parse(storedMembers)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      } catch (error) {
+        console.error('Error parsing members:', error)
+        setMembers([])
+      }
     }
 
     if (storedRole && storedMemberId) {
@@ -97,7 +103,7 @@ function App() {
                 👤 一般メンバー
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {members.filter(m => !m.is_admin).map(member => (
+                {(members || []).filter(m => !m.is_admin).map(member => (
                   <button
                     key={member.id}
                     className="role-btn member-btn"
@@ -215,15 +221,25 @@ function MemberManagement() {
   }, [])
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
   const saveMembers = (data: any[]) => {
-    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data))
-    setMembers(data)
+    try {
+      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data))
+      setMembers(data)
+    } catch (error) {
+      console.error('Error saving members:', error)
+    }
   }
 
   const addMember = () => {
@@ -603,16 +619,28 @@ function LocationManagement() {
   }, [])
 
   const loadLocations = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
-    if (stored) {
-      setLocations(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setLocations(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
@@ -1032,9 +1060,15 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   }, [selectedMemberId])
 
   const loadAttendance = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
-    if (stored) {
-      setAttendance(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setAttendance(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading attendance:', error)
+      setAttendance([])
     }
   }
 
@@ -1126,23 +1160,41 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   }
 
   const loadShifts = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
-    if (stored) {
-      setShifts(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setShifts(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading shifts:', error)
+      setShifts([])
     }
   }
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
   const loadLocations = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
-    if (stored) {
-      setLocations(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setLocations(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
@@ -2099,30 +2151,54 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   }, [])
 
   const loadShifts = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
-    if (stored) {
-      setShifts(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setShifts(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading shifts:', error)
+      setShifts([])
     }
   }
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
   const loadLocations = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
-    if (stored) {
-      setLocations(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setLocations(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
   const loadAttendance = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
-    if (stored) {
-      setAttendance(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setAttendance(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading attendance:', error)
+      setAttendance([])
     }
   }
 
@@ -2941,23 +3017,41 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
   }, [selectedMember, attendance])
 
   const loadAttendance = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
-    if (stored) {
-      setAttendance(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setAttendance(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading attendance:', error)
+      setAttendance([])
     }
   }
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
   const loadLocations = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
-    if (stored) {
-      setLocations(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setLocations(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
@@ -3224,30 +3318,54 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
   }, [selectedMemberId, selectedMember, selectedMonth, members, attendance, shifts, calculationType])
 
   const loadMembers = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
   const loadLocations = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
-    if (stored) {
-      setLocations(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setLocations(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
   const loadAttendance = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
-    if (stored) {
-      setAttendance(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setAttendance(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading attendance:', error)
+      setAttendance([])
     }
   }
 
   const loadShifts = () => {
-    const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
-    if (stored) {
-      setShifts(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setShifts(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading shifts:', error)
+      setShifts([])
     }
   }
 
