@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3000/api'
+const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3001/api'
 
 // 常駐先管理 - シンプル版（交通費なし）
 export function SimpleLocationManagement() {

@@ -6,7 +6,7 @@ import { LocationWithMemberFees } from './location-with-member-fees'
 
 type Tab = 'members' | 'locations' | 'shift' | 'attendance' | 'salary'
 
-const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api'
+const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('members')

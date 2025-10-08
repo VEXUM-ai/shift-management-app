@@ -38,7 +38,7 @@ interface BulkShiftRow {
   transportationFee: string
 }
 
-const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3000/api'
+const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3001/api'
 
 // エラーハンドリングユーティリティ
 async function handleApiError(response: Response) {
@@ -241,6 +241,7 @@ export function ShiftWithMonthlyView() {
   ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingShift, setEditingShift] = useState<Shift | null>(null)
 
   useEffect(() => {
     fetchShifts()
@@ -415,6 +416,63 @@ export function ShiftWithMonthlyView() {
     return location?.logo
   }, [locations])
 
+  const startEditShift = (shift: Shift) => {
+    setEditingShift(shift)
+  }
+
+  const updateShift = useCallback(async () => {
+    if (!editingShift) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`${API_BASE}/shifts/${editingShift.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_name: editingShift.employee_name,
+          location: editingShift.location,
+          date: editingShift.date,
+          start_time: editingShift.start_time,
+          end_time: editingShift.end_time,
+          transportation_fee: editingShift.transportation_fee,
+          status: editingShift.status
+        })
+      })
+      await handleApiError(response)
+      setEditingShift(null)
+      await fetchShifts()
+      alert('シフトを更新しました')
+    } catch (error) {
+      console.error('Error updating shift:', error)
+      setError(error instanceof Error ? error.message : 'シフトの更新に失敗しました')
+      alert(error instanceof Error ? error.message : 'シフトの更新に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [editingShift, fetchShifts])
+
+  const deleteShift = useCallback(async (id: number) => {
+    if (!confirm('このシフトを削除しますか？')) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`${API_BASE}/shifts/${id}`, { method: 'DELETE' })
+      await handleApiError(response)
+      await fetchShifts()
+      alert('シフトを削除しました')
+    } catch (error) {
+      console.error('Error deleting shift:', error)
+      setError(error instanceof Error ? error.message : 'シフトの削除に失敗しました')
+      alert(error instanceof Error ? error.message : 'シフトの削除に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchShifts])
+
   // 月ごとにグループ化（useMemoでパフォーマンス最適化）
   const monthlyShifts = useMemo(
     () => shifts.filter(s => s.date && s.date.startsWith(selectedMonth)),
@@ -505,6 +563,7 @@ export function ShiftWithMonthlyView() {
               <th>終了時間</th>
               <th>交通費</th>
               <th>ステータス</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -526,6 +585,10 @@ export function ShiftWithMonthlyView() {
                   <td>{shift.end_time}</td>
                   <td>¥{(shift.transportation_fee || 0).toLocaleString('ja-JP')}</td>
                   <td><span className="status-badge">{shift.status}</span></td>
+                  <td>
+                    <button className="edit-btn" onClick={() => startEditShift(shift)} disabled={loading}>編集</button>
+                    <button className="delete-btn" onClick={() => deleteShift(shift.id)} disabled={loading}>削除</button>
+                  </td>
                 </tr>
               )
             })}
@@ -535,6 +598,88 @@ export function ShiftWithMonthlyView() {
           <p className="no-data">この月のシフトはありません</p>
         )}
       </div>
+
+      {/* 編集モーダル */}
+      {editingShift && (
+        <div className="modal-overlay" onClick={() => setEditingShift(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>シフト編集</h3>
+            <div className="edit-form">
+              <div className="form-group">
+                <label>メンバー</label>
+                <select
+                  value={editingShift.employee_name}
+                  onChange={(e) => setEditingShift({...editingShift, employee_name: e.target.value})}
+                >
+                  {members.map(m => (
+                    <option key={m.id} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>勤務地</label>
+                <select
+                  value={editingShift.location}
+                  onChange={(e) => setEditingShift({...editingShift, location: e.target.value})}
+                >
+                  {locations.map(l => (
+                    <option key={l.id} value={l.name}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>日付</label>
+                <input
+                  type="date"
+                  value={editingShift.date}
+                  onChange={(e) => setEditingShift({...editingShift, date: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>開始時間</label>
+                <input
+                  type="time"
+                  value={editingShift.start_time}
+                  onChange={(e) => setEditingShift({...editingShift, start_time: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>終了時間</label>
+                <input
+                  type="time"
+                  value={editingShift.end_time}
+                  onChange={(e) => setEditingShift({...editingShift, end_time: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>交通費</label>
+                <input
+                  type="number"
+                  value={editingShift.transportation_fee}
+                  onChange={(e) => setEditingShift({...editingShift, transportation_fee: parseFloat(e.target.value)})}
+                />
+              </div>
+              <div className="form-group">
+                <label>ステータス</label>
+                <select
+                  value={editingShift.status}
+                  onChange={(e) => setEditingShift({...editingShift, status: e.target.value})}
+                >
+                  <option value="提出済み">提出済み</option>
+                  <option value="承認済み">承認済み</option>
+                  <option value="却下">却下</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button onClick={updateShift} className="submit-btn" disabled={loading}>
+                {loading ? '更新中...' : '更新'}
+              </button>
+              <button onClick={() => setEditingShift(null)} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

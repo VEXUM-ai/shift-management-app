@@ -1,7 +1,7 @@
 // LocationManagement - 交通費対応版
 import { useState, useEffect } from 'react'
 
-const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3000/api'
+const API_BASE = (import.meta as any).env.PROD ? '/api' : 'http://localhost:3001/api'
 
 export function LocationManagementEnhanced() {
   const [locations, setLocations] = useState<any[]>([])
