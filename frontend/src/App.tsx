@@ -591,6 +591,11 @@ function LocationManagement() {
   const [selectedLocation, setSelectedLocation] = useState<any>(null)
   const [memberTransportFees, setMemberTransportFees] = useState<{[key: number]: string}>({})
   const [selectedMembers, setSelectedMembers] = useState<number[]>([])
+  const [editingLocation, setEditingLocation] = useState<any>(null)
+  const [editName, setEditName] = useState('')
+  const [editIndustry, setEditIndustry] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [sortOrder, setSortOrder] = useState<'name' | 'industry' | 'date'>('date')
 
   useEffect(() => {
     loadLocations()
@@ -692,6 +697,48 @@ function LocationManagement() {
     alert('メンバー登録と交通費設定を保存しました')
   }
 
+  const openEditLocation = (location: any) => {
+    setEditingLocation(location)
+    setEditName(location.name)
+    setEditIndustry(location.industry || '')
+    setEditAddress(location.address || '')
+  }
+
+  const cancelEditLocation = () => {
+    setEditingLocation(null)
+    setEditName('')
+    setEditIndustry('')
+    setEditAddress('')
+  }
+
+  const saveEditLocation = () => {
+    if (!editName) {
+      alert('クライアント先名を入力してください')
+      return
+    }
+
+    const updated = locations.map(l =>
+      l.id === editingLocation.id
+        ? { ...l, name: editName, industry: editIndustry, address: editAddress, updated_at: new Date().toISOString() }
+        : l
+    )
+
+    saveLocations(updated)
+    cancelEditLocation()
+    alert('クライアント先情報を更新しました')
+  }
+
+  const getSortedLocations = () => {
+    const sorted = [...locations]
+    if (sortOrder === 'name') {
+      return sorted.sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+    } else if (sortOrder === 'industry') {
+      return sorted.sort((a, b) => (a.industry || '').localeCompare(b.industry || '', 'ja'))
+    } else {
+      return sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    }
+  }
+
   return (
     <div className="section">
       <h2>🏢 クライアント先管理（管理者専用）</h2>
@@ -749,9 +796,23 @@ function LocationManagement() {
         </div>
       </div>
 
-      <h3>📋 登録済みクライアント先一覧</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h3>📋 登録済みクライアント先一覧</h3>
+        <div className="form-group" style={{ margin: 0, minWidth: '200px' }}>
+          <label style={{ marginRight: '10px' }}>並び順:</label>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'name' | 'industry' | 'date')}
+            style={{ padding: '5px 10px' }}
+          >
+            <option value="date">登録日順（新しい順）</option>
+            <option value="name">名前順（あいうえお順）</option>
+            <option value="industry">業界順</option>
+          </select>
+        </div>
+      </div>
       <div className="locations-grid">
-        {locations.map((location) => (
+        {getSortedLocations().map((location) => (
           <div key={location.id} className="location-card">
             <div className="location-info">
               <h4>🏢 {location.name}</h4>
@@ -774,6 +835,13 @@ function LocationManagement() {
             <div className="location-actions">
               <button
                 className="edit-btn"
+                onClick={() => openEditLocation(location)}
+                style={{ backgroundColor: '#28a745' }}
+              >
+                ✏️ 編集
+              </button>
+              <button
+                className="edit-btn"
                 onClick={() => openMemberSettings(location)}
               >
                 👥 メンバー設定
@@ -785,6 +853,54 @@ function LocationManagement() {
       </div>
       {locations.length === 0 && (
         <p className="no-data">クライアント先が登録されていません</p>
+      )}
+
+      {/* クライアント先編集モーダル */}
+      {editingLocation && (
+        <div className="modal-overlay" onClick={cancelEditLocation}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <h3>✏️ クライアント先情報の編集</h3>
+
+            <div className="member-form">
+              <div className="form-group">
+                <label>クライアント先名 <span className="required">*必須</span></label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="例: 株式会社A、B商事"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>業界 <span className="optional">任意</span></label>
+                <input
+                  type="text"
+                  value={editIndustry}
+                  onChange={(e) => setEditIndustry(e.target.value)}
+                  placeholder="例: IT、製造、金融"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>場所・住所 <span className="optional">任意</span></label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  placeholder="例: 東京都渋谷区、大阪府大阪市"
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveEditLocation} className="submit-btn">
+                💾 保存
+              </button>
+              <button onClick={cancelEditLocation} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* メンバー設定モーダル */}
@@ -1569,6 +1685,45 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     filteredShifts = filteredShifts.filter(s => s.member_id === Number(filterMember))
   }
 
+  // 勤務地（会社）フィルター適用
+  if (filterLocation) {
+    if (filterLocation === 'office') {
+      filteredShifts = filteredShifts.filter(s => s.location_id === -1)
+    } else if (filterLocation === 'advisor') {
+      filteredShifts = filteredShifts.filter(s => s.location_id === -2)
+    } else if (filterLocation === 'other') {
+      filteredShifts = filteredShifts.filter(s => s.is_other === true)
+    } else {
+      filteredShifts = filteredShifts.filter(s => s.location_id === Number(filterLocation))
+    }
+  }
+
+  // 活動種別フィルター適用（研修・その他活動）
+  if (filterActivityType) {
+    if (filterActivityType === 'client') {
+      // クライアント先のみ（その他、オフィス、アドバイザー以外）
+      filteredShifts = filteredShifts.filter(s =>
+        !s.is_other && s.location_id !== -1 && s.location_id !== -2
+      )
+    } else if (filterActivityType === 'training') {
+      // 研修のみ（その他活動で「研修」を含むもの）
+      filteredShifts = filteredShifts.filter(s =>
+        s.is_other === true && s.location_name && s.location_name.includes('研修')
+      )
+    } else if (filterActivityType === 'other') {
+      // その他活動のみ（研修以外）
+      filteredShifts = filteredShifts.filter(s =>
+        s.is_other === true && (!s.location_name || !s.location_name.includes('研修'))
+      )
+    } else if (filterActivityType === 'office') {
+      // オフィス出勤のみ
+      filteredShifts = filteredShifts.filter(s => s.location_id === -1)
+    } else if (filterActivityType === 'advisor') {
+      // アドバイザーのみ
+      filteredShifts = filteredShifts.filter(s => s.location_id === -2)
+    }
+  }
+
   // 日付ごとにグループ化
   const groupedByDate = filteredShifts.reduce((acc: any, shift: any) => {
     if (!acc[shift.date]) {
@@ -1758,7 +1913,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
                 className="input-large"
                 value={otherActivity}
                 onChange={(e) => setOtherActivity(e.target.value)}
-                placeholder="例: 新人研修、営業活動、有給休暇"
+                placeholder="例: 新人研修、営業、資料作成、有給休暇"
               />
             </div>
           </div>
@@ -1884,7 +2039,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
                     type="text"
                     value={editOtherActivity}
                     onChange={(e) => setEditOtherActivity(e.target.value)}
-                    placeholder="例: 研修、営業"
+                    placeholder="例: 新人研修、営業、資料作成"
                   />
                 </div>
               )}
@@ -1922,6 +2077,8 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   const [attendance, setAttendance] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [filterMember, setFilterMember] = useState('')
+  const [filterLocation, setFilterLocation] = useState('')
+  const [filterActivityType, setFilterActivityType] = useState('')
   const [selectedShiftsForDelete, setSelectedShiftsForDelete] = useState<number[]>([])
   const [editingShiftInfo, setEditingShiftInfo] = useState<any>(null)
   const [editMember, setEditMember] = useState('')
@@ -2011,6 +2168,14 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     const updated = shifts.filter(s => !selectedShiftsForDelete.includes(s.id))
     saveShifts(updated)
     setSelectedShiftsForDelete([])
+  }
+
+  const deleteAllShifts = () => {
+    if (!confirm('⚠️ 警告: すべてのシフトデータを削除しますか？この操作は取り消せません。')) return
+    if (!confirm('本当にすべてのシフトを削除してもよろしいですか？')) return
+    saveShifts([])
+    setSelectedShiftsForDelete([])
+    alert('すべてのシフトを削除しました')
   }
 
   const reregisterFromDate = (date: string) => {
@@ -2187,6 +2352,45 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     filteredShifts = filteredShifts.filter(s => s.member_id === Number(filterMember))
   }
 
+  // 勤務地（会社）フィルター適用
+  if (filterLocation) {
+    if (filterLocation === 'office') {
+      filteredShifts = filteredShifts.filter(s => s.location_id === -1)
+    } else if (filterLocation === 'advisor') {
+      filteredShifts = filteredShifts.filter(s => s.location_id === -2)
+    } else if (filterLocation === 'other') {
+      filteredShifts = filteredShifts.filter(s => s.is_other === true)
+    } else {
+      filteredShifts = filteredShifts.filter(s => s.location_id === Number(filterLocation))
+    }
+  }
+
+  // 活動種別フィルター適用（研修・その他活動）
+  if (filterActivityType) {
+    if (filterActivityType === 'client') {
+      // クライアント先のみ（その他、オフィス、アドバイザー以外）
+      filteredShifts = filteredShifts.filter(s =>
+        !s.is_other && s.location_id !== -1 && s.location_id !== -2
+      )
+    } else if (filterActivityType === 'training') {
+      // 研修のみ（その他活動で「研修」を含むもの）
+      filteredShifts = filteredShifts.filter(s =>
+        s.is_other === true && s.location_name && s.location_name.includes('研修')
+      )
+    } else if (filterActivityType === 'other') {
+      // その他活動のみ（研修以外）
+      filteredShifts = filteredShifts.filter(s =>
+        s.is_other === true && (!s.location_name || !s.location_name.includes('研修'))
+      )
+    } else if (filterActivityType === 'office') {
+      // オフィス出勤のみ
+      filteredShifts = filteredShifts.filter(s => s.location_id === -1)
+    } else if (filterActivityType === 'advisor') {
+      // アドバイザーのみ
+      filteredShifts = filteredShifts.filter(s => s.location_id === -2)
+    }
+  }
+
   // 日付ごとにグループ化
   const groupedByDate = filteredShifts.reduce((acc: any, shift: any) => {
     if (!acc[shift.date]) {
@@ -2196,7 +2400,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     return acc
   }, {})
 
-  // カレンダービュー生成
+  // カレンダービュー生成（フィルター適用済み）
   const generateCalendarView = () => {
     if (!selectedMonth) return []
 
@@ -2208,12 +2412,13 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
 
     // 空セルを追加
     for (let i = 0; i < firstDay; i++) {
-      calendarCells.push({ isEmpty: true })
+      calendarCells.push({ isEmpty: true, key: `empty-${i}` })
     }
 
     // 各日のセルを追加
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      // フィルター済みのシフトから該当日のシフトを取得
       const dayShifts = filteredShifts.filter((s: any) => s.date === dateStr)
 
       calendarCells.push({
@@ -2221,7 +2426,8 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
         day,
         dayOfWeek: new Date(dateStr).getDay(),
         shifts: dayShifts,
-        isEmpty: false
+        isEmpty: false,
+        key: dateStr
       })
     }
 
@@ -2269,9 +2475,101 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
               </select>
             </div>
           )}
+          <div className="form-group">
+            <label>会社で絞り込み</label>
+            <select
+              value={filterLocation}
+              onChange={(e) => setFilterLocation(e.target.value)}
+            >
+              <option value="">全勤務地</option>
+              <option value="office">🏢 オフィス</option>
+              <option value="advisor">💼 アドバイザー</option>
+              <option value="other">📝 その他活動</option>
+              {locations.map(l => (
+                <option key={l.id} value={l.id}>🏢 {l.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>種別で絞り込み</label>
+            <select
+              value={filterActivityType}
+              onChange={(e) => setFilterActivityType(e.target.value)}
+            >
+              <option value="">全種別</option>
+              <option value="client">🏢 クライアント先</option>
+              <option value="training">📚 研修</option>
+              <option value="other">📝 その他活動</option>
+              <option value="office">🏢 オフィス出勤</option>
+              <option value="advisor">💼 アドバイザー</option>
+            </select>
+          </div>
           <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
         </div>
+        <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={deleteAllShifts}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            🗑️ すべてのシフトを削除
+          </button>
+        </div>
       </div>
+
+      {/* 一括削除セクション */}
+      {selectedShiftsForDelete.length > 0 && (
+        <div className="bulk-delete-section" style={{
+          backgroundColor: '#fff3cd',
+          border: '2px solid #ffc107',
+          borderRadius: '8px',
+          padding: '15px',
+          margin: '20px 0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <strong>✓ {selectedShiftsForDelete.length}件のシフトを選択中</strong>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setSelectedShiftsForDelete([])}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              選択解除
+            </button>
+            <button
+              onClick={bulkDeleteShifts}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              🗑️ 一括削除
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* カレンダービュー */}
       <div className="shift-calendar-view">
@@ -2287,68 +2585,75 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
 
           {calendarView.map((cell, index) => {
             if (cell.isEmpty) {
-              return <div key={`empty-${index}`} className="calendar-view-cell empty"></div>
+              return <div key={cell.key} className="calendar-view-cell empty"></div>
             }
 
             const isWeekend = cell.dayOfWeek === 0 || cell.dayOfWeek === 6
-            const hasShifts = cell.shifts.length > 0
+
+            // オフィス以外のシフトのみを表示対象とする
+            const mainShifts = cell.shifts.filter((s: any) => s.location_id !== -1)
+
+            // メンバーごとにグループ化
+            const memberGroups: { [key: string]: { shifts: any[], hasOffice: boolean } } = {}
+
+            cell.shifts.forEach((shift: any) => {
+              const key = shift.member_name
+              if (!memberGroups[key]) {
+                memberGroups[key] = { shifts: [], hasOffice: false }
+              }
+
+              if (shift.location_id === -1) {
+                memberGroups[key].hasOffice = true
+              } else {
+                memberGroups[key].shifts.push(shift)
+              }
+            })
+
+            // 表示可能なメンバー（メインシフトがあるメンバー）のみフィルター
+            const displayableMembers = Object.entries(memberGroups).filter(([_, data]) => data.shifts.length > 0)
 
             return (
               <div
-                key={cell.date}
-                className={`calendar-view-cell ${isWeekend ? 'weekend' : ''} ${hasShifts ? 'has-shifts' : ''}`}
+                key={cell.key}
+                className={`calendar-view-cell ${isWeekend ? 'weekend' : ''} ${displayableMembers.length > 0 ? 'has-shifts' : ''}`}
               >
                 <div className="cell-date">
                   {cell.day}
-                  {hasShifts && <span className="shift-count-badge">{cell.shifts.length}</span>}
+                  {displayableMembers.length > 0 && (
+                    <span className="shift-count-badge">{displayableMembers.length}</span>
+                  )}
                 </div>
                 <div className="cell-shifts">
-                  {(() => {
-                    // 同じ名前のメンバーをグループ化
-                    const groupedByMember = cell.shifts.reduce((acc: any, shift: any) => {
-                      if (!acc[shift.member_name]) {
-                        acc[shift.member_name] = []
-                      }
-                      acc[shift.member_name].push(shift)
-                      return acc
-                    }, {})
+                  {displayableMembers.map(([memberName, data]) => {
+                    const shift = data.shifts[0]
 
-                    return Object.entries(groupedByMember).map(([memberName, shifts]: [string, any]) => {
-                      // オフィス出勤があるかチェック
-                      const hasOffice = shifts.some((s: any) => s.location_id === -1)
-                      // 代表的なシフト情報を取得（最初のもの）
-                      const representativeShift = shifts[0]
+                    // クライアント先ごとに色を決定
+                    const colorClass = shift.is_other
+                      ? 'shift-other'
+                      : shift.location_id === -2
+                      ? 'shift-advisor'
+                      : `shift-location-${shift.location_id % 10}`
 
-                      // クライアント先ごとに色を決定
-                      const colorClass = representativeShift.is_other
-                        ? 'shift-other'
-                        : representativeShift.location_id === -2
-                        ? 'shift-advisor'
-                        : representativeShift.location_id === -1
-                        ? 'shift-office'
-                        : `shift-location-${representativeShift.location_id % 10}`
-
-                      return (
-                        <div
-                          key={`${cell.date}-${memberName}`}
-                          className={`mini-shift-card ${colorClass}`}
-                          onClick={() => openEditTime(representativeShift)}
-                        >
-                          <div className="mini-shift-member">
-                            {memberName}
-                            {hasOffice && <span className="office-badge">🏢</span>}
-                          </div>
-                          <div className="mini-shift-location">{representativeShift.location_name}</div>
-                          {representativeShift.start_time && representativeShift.end_time && (
-                            <div className="mini-shift-time">
-                              {representativeShift.start_time}-{representativeShift.end_time}
-                              {representativeShift.from_attendance && <span className="attendance-badge">📊</span>}
-                            </div>
-                          )}
+                    return (
+                      <div
+                        key={`${cell.date}-${memberName}`}
+                        className={`mini-shift-card ${colorClass}`}
+                        onClick={() => openEditTime(shift)}
+                      >
+                        <div className="mini-shift-member">
+                          {memberName}
+                          {data.hasOffice && <span className="office-badge">🏢</span>}
                         </div>
-                      )
-                    })
-                  })()}
+                        <div className="mini-shift-location">{shift.location_name}</div>
+                        {shift.start_time && shift.end_time && (
+                          <div className="mini-shift-time">
+                            {shift.start_time}-{shift.end_time}
+                            {shift.from_attendance && <span className="attendance-badge">📊</span>}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -2526,7 +2831,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                     }}
                     style={{ width: 'auto', marginRight: '8px' }}
                   />
-                  その他の活動（研修・営業・休暇など）
+                  その他の活動（研修・営業・資料作成・休暇など）
                 </label>
               </div>
 
@@ -2564,7 +2869,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                     type="text"
                     value={editOtherActivity}
                     onChange={(e) => setEditOtherActivity(e.target.value)}
-                    placeholder="例: 新人研修、営業活動、有給休暇"
+                    placeholder="例: 新人研修、営業、資料作成、有給休暇"
                   />
                 </div>
               )}
@@ -2968,42 +3273,74 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
       let totalSalary = 0
       let totalTransportFee = 0
 
+      // 日付ごとにグループ化
+      const dateGroups: { [key: string]: any[] } = {}
       records.forEach(record => {
-        const location = locations.find(l => l.id === record.location_id)
-        const locationName = record.location_name
-        const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
-        const hours = record.total_hours
-        const salary = member.salary_type === 'hourly' ? (hours * hourlyWage) : 0
+        if (!dateGroups[record.date]) {
+          dateGroups[record.date] = []
+        }
+        dateGroups[record.date].push(record)
+      })
 
-        // 交通費計算
-        let transportFee = 0
-        if (record.location_id === -1) {
-          // オフィス
-          transportFee = member.office_transport_fee || 0
-        } else if (location?.type === 'client') {
-          transportFee = location.member_transport_fees?.[member.id] || 0
+      // 各日付を処理
+      Object.entries(dateGroups).forEach(([date, dayRecords]) => {
+        // その日の最大交通費を計算（常駐先+オフィス出勤の場合、高い方を適用）
+        let maxTransportFee = 0
+        let totalDayHours = 0
+        let totalDaySalary = 0
+        let mainLocationName = ''
+
+        dayRecords.forEach(record => {
+          const location = locations.find(l => l.id === record.location_id)
+          const locationName = record.location_name
+          const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+          const hours = record.total_hours
+          const salary = member.salary_type === 'hourly' ? (hours * hourlyWage) : 0
+
+          // 交通費計算
+          let transportFee = 0
+          if (record.location_id === -1) {
+            // オフィス
+            transportFee = member.office_transport_fee || 0
+          } else if (location?.type === 'client') {
+            transportFee = location.member_transport_fees?.[member.id] || 0
+            // メインの勤務地として記録（オフィス以外）
+            if (!mainLocationName) {
+              mainLocationName = locationName
+            }
+          }
+
+          maxTransportFee = Math.max(maxTransportFee, transportFee)
+          totalDayHours += hours
+          totalDaySalary += salary
+        })
+
+        // メイン勤務地が特定できなければ最初のレコードを使用
+        if (!mainLocationName) {
+          mainLocationName = dayRecords[0].location_name
         }
 
-        if (!breakdown[locationName]) {
-          breakdown[locationName] = {
+        if (!breakdown[mainLocationName]) {
+          breakdown[mainLocationName] = {
             days: 0,
             hours: 0,
-            hourlyWage,
+            hourlyWage: member.salary_type === 'hourly' ? member.hourly_wage : 0,
             salary: 0,
             transportFee: 0,
             total: 0
           }
         }
 
-        breakdown[locationName].days += 1
-        breakdown[locationName].hours += hours
-        breakdown[locationName].salary += salary
-        breakdown[locationName].transportFee += transportFee
-        breakdown[locationName].total += salary + transportFee
+        // 1日につき1回集計（高い方の交通費を適用）
+        breakdown[mainLocationName].days += 1
+        breakdown[mainLocationName].hours += totalDayHours
+        breakdown[mainLocationName].salary += totalDaySalary
+        breakdown[mainLocationName].transportFee += maxTransportFee
+        breakdown[mainLocationName].total += totalDaySalary + maxTransportFee
 
-        totalHours += hours
-        totalSalary += salary
-        totalTransportFee += transportFee
+        totalHours += totalDayHours
+        totalSalary += totalDaySalary
+        totalTransportFee += maxTransportFee
       })
 
       // 固定給の場合は月額を加算
@@ -3054,14 +3391,13 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
       Object.entries(dateGroups).forEach(([date, dayShifts]) => {
         totalDays += 1
 
+        // その日の最大交通費を計算（常駐先+オフィス出勤の場合、高い方を適用）
+        let maxTransportFee = 0
+        let transportFeeLocations: { [key: string]: number } = {}
+
         dayShifts.forEach(shift => {
           const location = locations.find(l => l.id === shift.location_id)
           const locationName = shift.location_name || 'その他'
-
-          // 予想勤務時間（デフォルト8時間）
-          const estimatedHours = 8
-          const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
-          const salary = member.salary_type === 'hourly' ? (estimatedHours * hourlyWage) : 0
 
           // 交通費計算
           let transportFee = 0
@@ -3078,32 +3414,45 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
             transportFee = location.member_transport_fees?.[member.id] || 0
           }
 
-          if (!breakdown[locationName]) {
-            breakdown[locationName] = {
-              days: 0,
-              hours: 0,
-              hourlyWage,
-              salary: 0,
-              transportFee: 0,
-              total: 0
-            }
-          }
-
-          // シフトごとに集計（複数勤務地の場合）
-          breakdown[locationName].days += 1
-          if (member.salary_type === 'hourly') {
-            breakdown[locationName].hours += estimatedHours
-            breakdown[locationName].salary += salary
-          }
-          breakdown[locationName].transportFee += transportFee
-          breakdown[locationName].total += salary + transportFee
-
-          if (member.salary_type === 'hourly') {
-            totalHours += estimatedHours
-            totalSalary += salary
-          }
-          totalTransportFee += transportFee
+          transportFeeLocations[locationName] = transportFee
+          maxTransportFee = Math.max(maxTransportFee, transportFee)
         })
+
+        // メインシフト（オフィス以外）を特定
+        const mainShift = dayShifts.find(s => s.location_id !== -1) || dayShifts[0]
+        const mainLocation = locations.find(l => l.id === mainShift.location_id)
+        const mainLocationName = mainShift.location_name || 'その他'
+
+        // 予想勤務時間（デフォルト8時間）
+        const estimatedHours = 8
+        const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+        const salary = member.salary_type === 'hourly' ? (estimatedHours * hourlyWage) : 0
+
+        if (!breakdown[mainLocationName]) {
+          breakdown[mainLocationName] = {
+            days: 0,
+            hours: 0,
+            hourlyWage,
+            salary: 0,
+            transportFee: 0,
+            total: 0
+          }
+        }
+
+        // 1日につき1回集計（高い方の交通費を適用）
+        breakdown[mainLocationName].days += 1
+        if (member.salary_type === 'hourly') {
+          breakdown[mainLocationName].hours += estimatedHours
+          breakdown[mainLocationName].salary += salary
+        }
+        breakdown[mainLocationName].transportFee += maxTransportFee
+        breakdown[mainLocationName].total += salary + maxTransportFee
+
+        if (member.salary_type === 'hourly') {
+          totalHours += estimatedHours
+          totalSalary += salary
+        }
+        totalTransportFee += maxTransportFee
       })
 
       // 固定給の場合は月額を設定
