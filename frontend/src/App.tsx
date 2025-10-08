@@ -1,8 +1,49 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import './App.css'
 
 type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'attendance' | 'salary'
 type UserRole = 'admin' | 'member'
+
+// エラーバウンダリーコンポーネント
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('Error caught by boundary:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <h1>エラーが発生しました</h1>
+          <p>申し訳ございません。問題が発生しました。</p>
+          <button onClick={() => window.location.reload()}>
+            ページを再読み込み
+          </button>
+          {this.state.error && (
+            <details style={{ marginTop: '20px', textAlign: 'left' }}>
+              <summary>エラー詳細</summary>
+              <pre>{this.state.error.toString()}</pre>
+            </details>
+          )}
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 // LocalStorage Keys
 const STORAGE_KEYS = {
@@ -3798,4 +3839,13 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
   )
 }
 
-export default App
+// ErrorBoundaryでラップしたAppをエクスポート
+function AppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  )
+}
+
+export default AppWithErrorBoundary
