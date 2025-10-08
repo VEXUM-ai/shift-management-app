@@ -2583,9 +2583,13 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
           <div className="calendar-view-header">金</div>
           <div className="calendar-view-header saturday">土</div>
 
-          {calendarView.map((cell, index) => {
+          {calendarView && calendarView.length > 0 && calendarView.map((cell, index) => {
             if (cell.isEmpty) {
               return <div key={cell.key} className="calendar-view-cell empty"></div>
+            }
+
+            if (!cell.shifts || !Array.isArray(cell.shifts)) {
+              return <div key={cell.key} className="calendar-view-cell"></div>
             }
 
             const isWeekend = cell.dayOfWeek === 0 || cell.dayOfWeek === 6
@@ -2626,6 +2630,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                 <div className="cell-shifts">
                   {displayableMembers.map(([memberName, data]) => {
                     const shift = data.shifts[0]
+                    if (!shift) return null
 
                     // クライアント先ごとに色を決定
                     const colorClass = shift.is_other
@@ -2644,7 +2649,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                           {memberName}
                           {data.hasOffice && <span className="office-badge">🏢</span>}
                         </div>
-                        <div className="mini-shift-location">{shift.location_name}</div>
+                        <div className="mini-shift-location">{shift.location_name || ''}</div>
                         {shift.start_time && shift.end_time && (
                           <div className="mini-shift-time">
                             {shift.start_time}-{shift.end_time}
