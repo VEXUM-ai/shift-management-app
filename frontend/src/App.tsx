@@ -12,7 +12,7 @@ const generateSessionToken = (): string => {
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'attendance' | 'salary'
+type Tab = 'members' | 'locations' | 'shift' | 'shiftlist' | 'office' | 'clientmeeting' | 'attendance' | 'salary'
 type UserRole = 'admin' | 'member'
 
 interface AuthSession {
@@ -71,6 +71,7 @@ const STORAGE_KEYS = {
   LOCATIONS: 'shift_app_locations',
   SHIFTS: 'shift_app_shifts',
   ATTENDANCE: 'shift_app_attendance',
+  CLIENT_MEETINGS: 'shift_app_client_meetings', // クライアント会議データ
   USER_ROLE: 'shift_app_user_role',
   SELECTED_MEMBER_ID: 'shift_app_selected_member_id',
   AUTH_SESSION: 'shift_app_auth_session'
@@ -378,6 +379,12 @@ function App() {
           オフィス出勤表
         </button>
         <button
+          className={activeTab === 'clientmeeting' ? 'active' : ''}
+          onClick={() => setActiveTab('clientmeeting')}
+        >
+          クライアント会議
+        </button>
+        <button
           className={activeTab === 'attendance' ? 'active' : ''}
           onClick={() => setActiveTab('attendance')}
         >
@@ -399,6 +406,7 @@ function App() {
         {activeTab === 'shift' && <ShiftManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'shiftlist' && <ShiftListView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'office' && <OfficeAttendanceView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
+        {activeTab === 'clientmeeting' && <ClientMeetingView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'attendance' && <AttendanceManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
       </main>
@@ -3487,27 +3495,36 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   )
 }
 
-/**
- * オフィス出勤表コンポーネント
- * 常駐勤務（固定5時間）+ 個別ミーティング申請を管理
- */
+// オフィス出勤表（カレンダー形式）
 function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
-  // 状態管理
-  const [shifts, setShifts] = useState<any[]>([]) // シフト一覧
-  const [members, setMembers] = useState<any[]>([]) // メンバー一覧
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false) // モーダル表示状態
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null) // 編集中のメンバーID
-  const [editingDate, setEditingDate] = useState<string | null>(null) // 編集中の日付
+  const [shifts, setShifts] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [editingOfficeShift, setEditingOfficeShift] = useState<any>(null)
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
 
-  // 初回読み込み
+  const timeSlots = [
+    { value: '10:00', label: '10時' },
+    { value: '12:00', label: '12時' },
+    { value: '14:00', label: '14時' },
+    { value: '16:00', label: '16時' },
+    { value: '18:00', label: '18時' },
+    { value: '20:00', label: '20時' }
+  ]
+
   useEffect(() => {
     loadShifts()
     loadMembers()
   }, [])
 
-  /**
-   * LocalStorageからシフトデータを読み込み
-   */
+  useEffect(() => {
+    if (!selectedMonth) {
+      const today = new Date()
+      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      setSelectedMonth(currentMonth)
+    }
+  }, [])
+
   const loadShifts = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
@@ -3521,9 +3538,6 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     }
   }
 
-  /**
-   * LocalStorageからメンバーデータを読み込み
-   */
   const loadMembers = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
@@ -3537,187 +3551,744 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     }
   }
 
-  /**
-   * 今週の日付を生成（月曜日から日曜日まで）
-   * @returns 日付配列（YYYY-MM-DD形式）
-   */
-  const getWeekDates = () => {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1))
-
-    const weekDates: string[] = []
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(monday)
-      date.setDate(monday.getDate() + i)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      weekDates.push(`${year}-${month}-${day}`)
+  const saveShifts = (data: any[]) => {
+    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(data))) {
+      setShifts(data)
     }
-    return weekDates
   }
 
-  // メンバーデータを変換（個人ページの場合はフィルタリング）
+  const openOfficeShiftModal = (date: string, memberId: number, memberName: string) => {
+    const existingOffice = shifts.find(
+      s => s.date === date && s.member_id === memberId && s.location_id === -1
+    )
+
+    setEditingOfficeShift({
+      id: existingOffice?.id || null,
+      member_id: memberId,
+      member_name: memberName,
+      date: date,
+      start_time: existingOffice?.start_time || '',
+      notes: existingOffice?.notes || ''
+    })
+    setSelectedTimeSlot(existingOffice?.start_time || '')
+  }
+
+  const saveOfficeShift = () => {
+    if (!editingOfficeShift) return
+    if (!selectedTimeSlot) {
+      alert('時間帯を選択してください')
+      return
+    }
+
+    let updated: any[]
+    if (editingOfficeShift.id === null) {
+      const newOfficeShift = {
+        id: Date.now(),
+        member_id: editingOfficeShift.member_id,
+        member_name: editingOfficeShift.member_name,
+        location_id: -1,
+        location_name: 'オフィス',
+        is_other: false,
+        date: editingOfficeShift.date,
+        start_time: selectedTimeSlot,
+        end_time: null,
+        notes: editingOfficeShift.notes || null,
+        status: '提出済み',
+        created_at: new Date().toISOString()
+      }
+      updated = [...shifts, newOfficeShift]
+    } else {
+      updated = shifts.map(s =>
+        s.id === editingOfficeShift.id
+          ? {
+              ...s,
+              start_time: selectedTimeSlot,
+              notes: editingOfficeShift.notes || null,
+              updated_at: new Date().toISOString()
+            }
+          : s
+      )
+    }
+
+    saveShifts(updated)
+    cancelOfficeShiftModal()
+  }
+
+  const deleteOfficeShift = () => {
+    if (!editingOfficeShift || editingOfficeShift.id === null) return
+    if (!confirm('オフィス出勤を削除しますか？')) return
+
+    const updated = shifts.filter(s => s.id !== editingOfficeShift.id)
+    saveShifts(updated)
+    cancelOfficeShiftModal()
+  }
+
+  const cancelOfficeShiftModal = () => {
+    setEditingOfficeShift(null)
+    setSelectedTimeSlot('')
+  }
+
+  const generateCalendarDates = () => {
+    if (!selectedMonth) return []
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const lastDay = new Date(year, month, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const calendar: any[] = []
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      calendar.push({ isEmpty: true })
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      calendar.push({
+        date: dateStr,
+        day,
+        dayOfWeek: new Date(dateStr).getDay()
+      })
+    }
+
+    return calendar
+  }
+
+  const officeShifts = shifts.filter(s => s.location_id === -1)
+  const filteredShifts = selectedMonth
+    ? officeShifts.filter(s => s.date.startsWith(selectedMonth))
+    : officeShifts
+
+  const displayShifts = selectedMemberId
+    ? filteredShifts.filter(s => s.member_id === selectedMemberId)
+    : filteredShifts
+
+  const exportCSV = () => {
+    if (displayShifts.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['日付', 'メンバー', '開始時間', '終了時間', '備考', 'ステータス']
+    const rows = displayShifts
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(s => [
+        s.date,
+        s.member_name,
+        s.start_time || '',
+        s.end_time || '',
+        s.notes || '',
+        s.status
+      ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `office_attendance_${selectedMonth}.csv`
+    link.click()
+  }
+
+  const calendarDates = generateCalendarDates()
   const displayMembers = selectedMemberId
     ? members.filter((m: any) => m.id === selectedMemberId)
     : members
 
-  const transformedMembers = displayMembers.map((m: any) => ({
-    id: String(m.id),
-    name: m.name,
-    department: m.department || '未設定',
-    avatar: m.avatar
-  }))
+  return (
+    <div className="section">
+      <h2>🏢 オフィス出勤表{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
 
-  // シフトデータを出勤記録に変換（オフィス出勤のみ）
-  const officeShifts = shifts.filter((s: any) => s.location_id === -1)
-
-  // 個人ページの場合はメンバーでフィルタリング
-  const displayShifts = selectedMemberId
-    ? officeShifts.filter((s: any) => s.member_id === selectedMemberId)
-    : officeShifts
-
-  const attendanceRecords = displayShifts.map((s: any) => {
-    // ステータスを判定
-    let status: 'office' | 'remote' | 'off' = 'office'
-    if (s.notes?.includes('在宅') || s.notes?.includes('リモート')) {
-      status = 'remote'
-    } else if (s.notes?.includes('休') || s.notes?.includes('有給')) {
-      status = 'off'
-    }
-
-    // 常駐勤務の終了時刻を計算（開始時刻+5時間）
-    const calculateEndTime = (startTime: string): string => {
-      const [hours, minutes] = startTime.split(':').map(Number)
-      const endHours = hours + 5
-      return `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-    }
-
-    // ミーティングデータの解析（notes から抽出、または meetings フィールドから）
-    const meetings = s.meetings || []
-
-    return {
-      memberId: String(s.member_id),
-      date: s.date,
-      status,
-      residenceStartTime: s.start_time || undefined,
-      residenceEndTime: s.start_time ? calculateEndTime(s.start_time) : undefined,
-      residenceClient: s.location_name || 'オフィス',
-      meetings: meetings,
-      memo: s.notes || undefined
-    }
-  })
-
-  const weekDates = getWeekDates()
-
-  const handleEditAttendance = (memberId: string, date: string) => {
-    setEditingMemberId(memberId)
-    setEditingDate(date)
-    setIsEditModalOpen(true)
-  }
-
-  const handleSaveAttendance = (data: {
-    residenceStartTime?: string;
-    residenceClient?: string;
-    meetings: any[];
-    memo?: string;
-  }) => {
-    if (!editingMemberId || !editingDate) return
-
-    const memberIdNum = parseInt(editingMemberId)
-    const existingShiftIndex = shifts.findIndex(
-      (s: any) => s.member_id === memberIdNum && s.date === editingDate && s.location_id === -1
-    )
-
-    const member = members.find((m: any) => m.id === memberIdNum)
-    const updatedShift = {
-      id: existingShiftIndex >= 0 ? shifts[existingShiftIndex].id : Date.now(),
-      member_id: memberIdNum,
-      member_name: member?.name || '',
-      location_id: -1,
-      location_name: data.residenceClient || 'オフィス',
-      is_other: false,
-      date: editingDate,
-      start_time: data.residenceStartTime || null,
-      end_time: null,
-      notes: data.memo || null,
-      meetings: data.meetings || [],
-      status: '提出済み',
-      created_at: existingShiftIndex >= 0 ? shifts[existingShiftIndex].created_at : new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    let updatedShifts: any[]
-    if (existingShiftIndex >= 0) {
-      updatedShifts = shifts.map((s: any, idx: number) =>
-        idx === existingShiftIndex ? updatedShift : s
-      )
-    } else {
-      updatedShifts = [...shifts, updatedShift]
-    }
-
-    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(updatedShifts))) {
-      setShifts(updatedShifts)
-      setIsEditModalOpen(false)
-      setEditingMemberId(null)
-      setEditingDate(null)
-    }
-  }
-
-  const getCurrentEditingRecord = () => {
-    if (!editingMemberId || !editingDate) return null
-    const memberIdNum = parseInt(editingMemberId)
-    return shifts.find(
-      (s: any) => s.member_id === memberIdNum && s.date === editingDate && s.location_id === -1
-    )
-  }
-
-  const editingRecord = getCurrentEditingRecord()
-  const editingMember = editingMemberId ? members.find((m: any) => String(m.id) === editingMemberId) : null
-
-  if (transformedMembers.length === 0) {
-    return (
-      <div className="section">
-        <h2>🏢 オフィス出勤表</h2>
-        <p style={{ textAlign: 'center', padding: '40px', color: '#667085' }}>
-          メンバーが登録されていません。先にメンバー管理からメンバーを追加してください。
-        </p>
+      <div className="filter-section">
+        <h3>📊 オフィス出勤管理</h3>
+        <div className="filter-bar">
+          <div className="form-group">
+            <label>月を選択</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+        </div>
+        <p className="info-text">クリックして時間帯を選択してください（10時/12時/14時/16時/18時/20時）</p>
       </div>
-    )
+
+      <div className="office-calendar" style={{ marginTop: '20px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}>メンバー</th>
+              {calendarDates.map((cell, idx) => {
+                if (cell.isEmpty) return <th key={`empty-${idx}`} style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}></th>
+                const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+                return (
+                  <th key={cell.date} style={{
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    backgroundColor: '#f5f5f5',
+                    color: dayClass === 'sunday' ? '#e74c3c' : dayClass === 'saturday' ? '#3498db' : '#333',
+                    fontSize: '0.9em'
+                  }}>
+                    <div>{cell.day}</div>
+                    <div style={{ fontSize: '0.8em' }}>
+                      {['日', '月', '火', '水', '木', '金', '土'][cell.dayOfWeek]}
+                    </div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {displayMembers.map((member: any) => (
+              <tr key={member.id}>
+                <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
+                  {member.name}
+                </td>
+                {calendarDates.map((cell, idx) => {
+                  if (cell.isEmpty) return <td key={`empty-${idx}`} style={{ border: '1px solid #ddd', backgroundColor: '#f9f9f9' }}></td>
+
+                  const officeShift = shifts.find(
+                    (s: any) => s.date === cell.date && s.member_id === member.id && s.location_id === -1
+                  )
+
+                  const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+
+                  return (
+                    <td
+                      key={cell.date}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '4px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: officeShift ? '#d4edda' : dayClass === 'sunday' ? '#ffebee' : dayClass === 'saturday' ? '#e3f2fd' : 'white',
+                        position: 'relative'
+                      }}
+                      onClick={() => openOfficeShiftModal(cell.date, member.id, member.name)}
+                      title={officeShift ? `オフィス出勤: ${officeShift.start_time}` : 'クリックして追加'}
+                    >
+                      {officeShift && (
+                        <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#155724' }}>
+                          🏢 {officeShift.start_time}
+                        </div>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {editingOfficeShift && (
+        <div className="modal-overlay" onClick={cancelOfficeShiftModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>🏢 オフィス出勤 - 時間帯選択</h3>
+            <div className="modal-guide">
+              <p><strong>メンバー:</strong> {editingOfficeShift.member_name}</p>
+              <p><strong>日付:</strong> {editingOfficeShift.date}</p>
+            </div>
+
+            <div className="time-edit-form">
+              <div className="form-group">
+                <label>出勤時間帯 <span className="required">*必須</span></label>
+                <select
+                  value={selectedTimeSlot}
+                  onChange={(e) => setSelectedTimeSlot(e.target.value)}
+                  style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+                >
+                  <option value="">選択してください</option>
+                  {timeSlots.map(slot => (
+                    <option key={slot.value} value={slot.value}>{slot.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>備考</label>
+                <textarea
+                  value={editingOfficeShift.notes || ''}
+                  onChange={(e) => setEditingOfficeShift({ ...editingOfficeShift, notes: e.target.value })}
+                  placeholder="例: 午前のみ、会議あり"
+                  rows={3}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveOfficeShift} className="submit-btn">保存</button>
+              {editingOfficeShift.id !== null && (
+                <button onClick={deleteOfficeShift} className="delete-btn" style={{ backgroundColor: '#dc3545' }}>削除</button>
+              )}
+              <button onClick={cancelOfficeShiftModal} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// クライアント会議管理
+function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
+  const [clientMeetings, setClientMeetings] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [clientGroups, setClientGroups] = useState<string[]>([])
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [editingMeeting, setEditingMeeting] = useState<any>(null)
+  const [newClientGroup, setNewClientGroup] = useState('')
+
+  useEffect(() => {
+    loadClientMeetings()
+    loadMembers()
+    loadClientGroups()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedMonth) {
+      const today = new Date()
+      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      setSelectedMonth(currentMonth)
+    }
+  }, [])
+
+  const loadClientMeetings = () => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CLIENT_MEETINGS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setClientMeetings(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading client meetings:', error)
+      setClientMeetings([])
+    }
   }
+
+  const loadMembers = () => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
+    }
+  }
+
+  const loadClientGroups = () => {
+    try {
+      const stored = localStorage.getItem('shift_app_client_groups')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setClientGroups(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading client groups:', error)
+      setClientGroups([])
+    }
+  }
+
+  const saveClientMeetings = (data: any[]) => {
+    if (safeLocalStorageSet(STORAGE_KEYS.CLIENT_MEETINGS, JSON.stringify(data))) {
+      setClientMeetings(data)
+    }
+  }
+
+  const saveClientGroups = (groups: string[]) => {
+    if (safeLocalStorageSet('shift_app_client_groups', JSON.stringify(groups))) {
+      setClientGroups(groups)
+    }
+  }
+
+  const addClientGroup = () => {
+    if (!newClientGroup.trim()) {
+      alert('クライアントグループ名を入力してください')
+      return
+    }
+
+    if (clientGroups.includes(newClientGroup.trim())) {
+      alert('このクライアントグループは既に存在します')
+      return
+    }
+
+    const updated = [...clientGroups, newClientGroup.trim()]
+    saveClientGroups(updated)
+    setNewClientGroup('')
+  }
+
+  const deleteClientGroup = (groupName: string) => {
+    if (!confirm(`「${groupName}」を削除しますか？このグループに関連する会議は削除されません。`)) return
+
+    const updated = clientGroups.filter(g => g !== groupName)
+    saveClientGroups(updated)
+  }
+
+  const openMeetingModal = (date: string, memberId: number, memberName: string, clientGroup?: string) => {
+    const existingMeeting = clientMeetings.find(
+      m => m.date === date && m.member_id === memberId && m.client_group === clientGroup
+    )
+
+    setEditingMeeting({
+      id: existingMeeting?.id || null,
+      member_id: memberId,
+      member_name: memberName,
+      date: date,
+      client_group: clientGroup || '',
+      start_time: existingMeeting?.start_time || '',
+      end_time: existingMeeting?.end_time || '',
+      purpose: existingMeeting?.purpose || '',
+      notes: existingMeeting?.notes || ''
+    })
+  }
+
+  const saveMeeting = () => {
+    if (!editingMeeting) return
+    if (!editingMeeting.client_group) {
+      alert('クライアントグループを選択してください')
+      return
+    }
+    if (!editingMeeting.start_time || !editingMeeting.end_time) {
+      alert('開始時刻と終了時刻を入力してください')
+      return
+    }
+
+    let updated: any[]
+    if (editingMeeting.id === null) {
+      const newMeeting = {
+        id: Date.now(),
+        member_id: editingMeeting.member_id,
+        member_name: editingMeeting.member_name,
+        date: editingMeeting.date,
+        client_group: editingMeeting.client_group,
+        start_time: editingMeeting.start_time,
+        end_time: editingMeeting.end_time,
+        purpose: editingMeeting.purpose || null,
+        notes: editingMeeting.notes || null,
+        created_at: new Date().toISOString()
+      }
+      updated = [...clientMeetings, newMeeting]
+    } else {
+      updated = clientMeetings.map(m =>
+        m.id === editingMeeting.id
+          ? {
+              ...m,
+              client_group: editingMeeting.client_group,
+              start_time: editingMeeting.start_time,
+              end_time: editingMeeting.end_time,
+              purpose: editingMeeting.purpose || null,
+              notes: editingMeeting.notes || null,
+              updated_at: new Date().toISOString()
+            }
+          : m
+      )
+    }
+
+    saveClientMeetings(updated)
+    cancelMeetingModal()
+  }
+
+  const deleteMeeting = () => {
+    if (!editingMeeting || editingMeeting.id === null) return
+    if (!confirm('この会議を削除しますか？')) return
+
+    const updated = clientMeetings.filter(m => m.id !== editingMeeting.id)
+    saveClientMeetings(updated)
+    cancelMeetingModal()
+  }
+
+  const cancelMeetingModal = () => {
+    setEditingMeeting(null)
+  }
+
+  const generateCalendarDates = () => {
+    if (!selectedMonth) return []
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const lastDay = new Date(year, month, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const calendar: any[] = []
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      calendar.push({ isEmpty: true })
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      calendar.push({
+        date: dateStr,
+        day,
+        dayOfWeek: new Date(dateStr).getDay()
+      })
+    }
+
+    return calendar
+  }
+
+  const filteredMeetings = selectedMonth
+    ? clientMeetings.filter(m => m.date.startsWith(selectedMonth))
+    : clientMeetings
+
+  const displayMeetings = selectedMemberId
+    ? filteredMeetings.filter(m => m.member_id === selectedMemberId)
+    : filteredMeetings
+
+  const exportCSV = () => {
+    if (displayMeetings.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['日付', 'メンバー', 'クライアントグループ', '開始時刻', '終了時刻', '目的', '備考']
+    const rows = displayMeetings
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(m => [
+        m.date,
+        m.member_name,
+        m.client_group,
+        m.start_time || '',
+        m.end_time || '',
+        m.purpose || '',
+        m.notes || ''
+      ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `client_meetings_${selectedMonth}.csv`
+    link.click()
+  }
+
+  const calendarDates = generateCalendarDates()
+  const displayMembers = selectedMemberId
+    ? members.filter((m: any) => m.id === selectedMemberId)
+    : members
 
   return (
     <div className="section">
-      {selectedMemberId && currentMemberName && (
-        <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '8px', borderLeft: '4px solid #1e63ff' }}>
-          <strong>👤 {currentMemberName}さん</strong>の個人ページ
+      <h2>📅 クライアント会議{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+
+      {/* クライアントグループ管理 */}
+      <div className="filter-section" style={{ marginBottom: '20px' }}>
+        <h3>👥 クライアントグループ管理</h3>
+        <div className="form-group" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label>新しいグループを追加</label>
+            <input
+              type="text"
+              value={newClientGroup}
+              onChange={(e) => setNewClientGroup(e.target.value)}
+              placeholder="例: A社、B社グループ"
+              onKeyPress={(e) => e.key === 'Enter' && addClientGroup()}
+            />
+          </div>
+          <button onClick={addClientGroup} className="submit-btn">追加</button>
+        </div>
+        <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {clientGroups.map(group => (
+            <div key={group} style={{
+              padding: '6px 12px',
+              backgroundColor: '#e0e7ff',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>{group}</span>
+              <button
+                onClick={() => deleteClientGroup(group)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#ef4444',
+                  fontSize: '1.2em',
+                  padding: '0',
+                  lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* カレンダー */}
+      <div className="filter-section">
+        <h3>📊 会議スケジュール</h3>
+        <div className="filter-bar">
+          <div className="form-group">
+            <label>月を選択</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+        </div>
+        <p className="info-text">クリックして会議を追加・編集してください</p>
+      </div>
+
+      <div className="office-calendar" style={{ marginTop: '20px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}>メンバー</th>
+              {calendarDates.map((cell, idx) => {
+                if (cell.isEmpty) return <th key={`empty-${idx}`} style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}></th>
+                const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+                return (
+                  <th key={cell.date} style={{
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    backgroundColor: '#f5f5f5',
+                    color: dayClass === 'sunday' ? '#e74c3c' : dayClass === 'saturday' ? '#3498db' : '#333',
+                    fontSize: '0.9em'
+                  }}>
+                    <div>{cell.day}</div>
+                    <div style={{ fontSize: '0.8em' }}>
+                      {['日', '月', '火', '水', '木', '金', '土'][cell.dayOfWeek]}
+                    </div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {displayMembers.map((member: any) => (
+              <tr key={member.id}>
+                <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
+                  {member.name}
+                </td>
+                {calendarDates.map((cell, idx) => {
+                  if (cell.isEmpty) return <td key={`empty-${idx}`} style={{ border: '1px solid #ddd', backgroundColor: '#f9f9f9' }}></td>
+
+                  const dayMeetings = clientMeetings.filter(
+                    (m: any) => m.date === cell.date && m.member_id === member.id
+                  )
+
+                  const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+
+                  return (
+                    <td
+                      key={cell.date}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '4px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: dayMeetings.length > 0 ? '#dbeafe' : dayClass === 'sunday' ? '#ffebee' : dayClass === 'saturday' ? '#e3f2fd' : 'white',
+                        position: 'relative'
+                      }}
+                      onClick={() => openMeetingModal(cell.date, member.id, member.name)}
+                      title={dayMeetings.length > 0 ? `会議 ${dayMeetings.length}件` : 'クリックして追加'}
+                    >
+                      {dayMeetings.length > 0 && (
+                        <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#1e40af' }}>
+                          📅 {dayMeetings.length}件
+                        </div>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 会議編集モーダル */}
+      {editingMeeting && (
+        <div className="modal-overlay" onClick={cancelMeetingModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>📅 クライアント会議</h3>
+            <div className="modal-guide">
+              <p><strong>メンバー:</strong> {editingMeeting.member_name}</p>
+              <p><strong>日付:</strong> {editingMeeting.date}</p>
+            </div>
+
+            <div className="time-edit-form">
+              <div className="form-group">
+                <label>クライアントグループ <span className="required">*必須</span></label>
+                <select
+                  value={editingMeeting.client_group}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, client_group: e.target.value })}
+                  style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+                >
+                  <option value="">選択してください</option>
+                  {clientGroups.map(group => (
+                    <option key={group} value={group}>{group}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>開始時刻 <span className="required">*必須</span></label>
+                <input
+                  type="time"
+                  value={editingMeeting.start_time}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, start_time: e.target.value })}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>終了時刻 <span className="required">*必須</span></label>
+                <input
+                  type="time"
+                  value={editingMeeting.end_time}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, end_time: e.target.value })}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>目的・内容</label>
+                <input
+                  type="text"
+                  value={editingMeeting.purpose || ''}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, purpose: e.target.value })}
+                  placeholder="例: 月次報告会、打ち合わせ"
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>備考</label>
+                <textarea
+                  value={editingMeeting.notes || ''}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, notes: e.target.value })}
+                  placeholder="その他メモ"
+                  rows={3}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveMeeting} className="submit-btn">保存</button>
+              {editingMeeting.id !== null && (
+                <button onClick={deleteMeeting} className="delete-btn" style={{ backgroundColor: '#dc3545' }}>削除</button>
+              )}
+              <button onClick={cancelMeetingModal} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
         </div>
       )}
-      <AttendanceTable
-        members={transformedMembers}
-        records={attendanceRecords}
-        weekDates={weekDates}
-        onEditAttendance={handleEditAttendance}
-      />
-
-      {/* 出勤編集モーダル */}
-      <AttendanceEditModal
-        isOpen={isEditModalOpen}
-        memberName={editingMember?.name || ''}
-        date={editingDate || ''}
-        initialResidenceStartTime={editingRecord?.start_time}
-        initialResidenceClient={editingRecord?.location_name}
-        initialMeetings={editingRecord?.meetings || []}
-        initialMemo={editingRecord?.notes}
-        onSave={handleSaveAttendance}
-        onClose={() => {
-          setIsEditModalOpen(false)
-          setEditingMemberId(null)
-          setEditingDate(null)
-        }}
-      />
     </div>
   )
 }
@@ -4176,6 +4747,7 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
   const [locations, setLocations] = useState<any[]>([])
   const [attendance, setAttendance] = useState<any[]>([])
   const [shifts, setShifts] = useState<any[]>([])
+  const [clientMeetings, setClientMeetings] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
   const [salaryData, setSalaryData] = useState<any>(null)
@@ -4186,6 +4758,7 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
     loadLocations()
     loadAttendance()
     loadShifts()
+    loadClientMeetings()
 
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -4204,7 +4777,7 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
         calculateSalary()
       }
     }
-  }, [selectedMemberId, selectedMember, selectedMonth, members, attendance, shifts, calculationType])
+  }, [selectedMemberId, selectedMember, selectedMonth, members, attendance, shifts, clientMeetings, calculationType])
 
   const loadMembers = () => {
     try {
@@ -4255,6 +4828,19 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
     } catch (error) {
       console.error('Error loading shifts:', error)
       setShifts([])
+    }
+  }
+
+  const loadClientMeetings = () => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CLIENT_MEETINGS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setClientMeetings(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading client meetings:', error)
+      setClientMeetings([])
     }
   }
 
@@ -4353,6 +4939,43 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
         totalHours += totalDayHours
         totalSalary += totalDaySalary
         totalTransportFee += maxTransportFee
+      })
+
+      // クライアント会議時間を追加
+      const memberMeetings = clientMeetings.filter(m =>
+        m.member_id === Number(selectedMember) &&
+        m.date.startsWith(selectedMonth)
+      )
+
+      memberMeetings.forEach(meeting => {
+        const clientGroupName = `クライアント会議: ${meeting.client_group}`
+
+        // 会議時間を計算
+        const [startHours, startMinutes] = meeting.start_time.split(':').map(Number)
+        const [endHours, endMinutes] = meeting.end_time.split(':').map(Number)
+        const meetingHours = (endHours * 60 + endMinutes - (startHours * 60 + startMinutes)) / 60
+
+        const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+        const meetingSalary = member.salary_type === 'hourly' ? (meetingHours * hourlyWage) : 0
+
+        if (!breakdown[clientGroupName]) {
+          breakdown[clientGroupName] = {
+            days: 0,
+            hours: 0,
+            hourlyWage,
+            salary: 0,
+            transportFee: 0,
+            total: 0
+          }
+        }
+
+        breakdown[clientGroupName].days += 1
+        breakdown[clientGroupName].hours += meetingHours
+        breakdown[clientGroupName].salary += meetingSalary
+        breakdown[clientGroupName].total += meetingSalary
+
+        totalHours += meetingHours
+        totalSalary += meetingSalary
       })
 
       // 固定給の場合は月額を加算
@@ -4465,6 +5088,45 @@ function SalaryCalculation({ selectedMemberId, currentMemberName }: { selectedMe
           totalSalary += salary
         }
         totalTransportFee += maxTransportFee
+      })
+
+      // クライアント会議時間を追加（予想）
+      const memberMeetings = clientMeetings.filter(m =>
+        m.member_id === Number(selectedMember) &&
+        m.date.startsWith(selectedMonth)
+      )
+
+      memberMeetings.forEach(meeting => {
+        const clientGroupName = `クライアント会議: ${meeting.client_group}`
+
+        // 会議時間を計算
+        const [startHours, startMinutes] = meeting.start_time.split(':').map(Number)
+        const [endHours, endMinutes] = meeting.end_time.split(':').map(Number)
+        const meetingHours = (endHours * 60 + endMinutes - (startHours * 60 + startMinutes)) / 60
+
+        const hourlyWage = member.salary_type === 'hourly' ? member.hourly_wage : 0
+        const meetingSalary = member.salary_type === 'hourly' ? (meetingHours * hourlyWage) : 0
+
+        if (!breakdown[clientGroupName]) {
+          breakdown[clientGroupName] = {
+            days: 0,
+            hours: 0,
+            hourlyWage,
+            salary: 0,
+            transportFee: 0,
+            total: 0
+          }
+        }
+
+        breakdown[clientGroupName].days += 1
+        breakdown[clientGroupName].hours += meetingHours
+        breakdown[clientGroupName].salary += meetingSalary
+        breakdown[clientGroupName].total += meetingSalary
+
+        if (member.salary_type === 'hourly') {
+          totalHours += meetingHours
+          totalSalary += meetingSalary
+        }
       })
 
       // 固定給の場合は月額を設定
