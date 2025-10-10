@@ -1942,13 +1942,14 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
       return
     }
 
-    const header = ['メンバー', '勤務地', '日付', '開始時間', '終了時間', 'ステータス']
+    const header = ['メンバー', '勤務地', '日付', '開始時間', '終了時間', '備考', 'ステータス']
     const rows = filtered.map(s => [
       s.member_name,
       s.location_name,
       s.date,
-      s.start_time,
-      s.end_time,
+      s.start_time || '',
+      s.end_time || '',
+      s.notes || '',
       s.status
     ])
 
@@ -3026,10 +3027,15 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                           {data.hasOffice && <span className="office-badge">🏢</span>}
                         </div>
                         <div className="mini-shift-location">{shift.location_name || ''}</div>
-                        {shift.start_time && shift.end_time && (
+                        {(shift.start_time || shift.end_time) && (
                           <div className="mini-shift-time">
-                            {shift.start_time}-{shift.end_time}
+                            {shift.start_time || '--'}:{shift.end_time || '--'}
                             {shift.from_attendance && <span className="attendance-badge">📊</span>}
+                          </div>
+                        )}
+                        {shift.notes && (
+                          <div className="mini-shift-notes" style={{ fontSize: '0.85em', color: '#666', marginTop: '2px' }}>
+                            📝 {shift.notes}
                           </div>
                         )}
                       </div>
@@ -3067,6 +3073,8 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                   <th className="col-date">日付</th>
                   <th className="col-member">メンバー</th>
                   <th className="col-location">勤務地</th>
+                  <th className="col-time">時間</th>
+                  <th className="col-notes">備考</th>
                   <th className="col-actions">操作</th>
                 </tr>
               </thead>
@@ -3145,6 +3153,26 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                               </span>
                             ))}
                           </div>
+                        </td>
+                        <td className="col-time">
+                          {mainShift.start_time && mainShift.end_time ? (
+                            <span className="time-range">
+                              {mainShift.start_time} - {mainShift.end_time}
+                            </span>
+                          ) : mainShift.start_time ? (
+                            <span className="time-range">{mainShift.start_time} -</span>
+                          ) : mainShift.end_time ? (
+                            <span className="time-range">- {mainShift.end_time}</span>
+                          ) : (
+                            <span className="time-empty">-</span>
+                          )}
+                        </td>
+                        <td className="col-notes">
+                          {mainShift.notes ? (
+                            <span className="notes-text">{mainShift.notes}</span>
+                          ) : (
+                            <span className="notes-empty">-</span>
+                          )}
                         </td>
                         <td className="col-actions">
                           <div className="action-buttons">
