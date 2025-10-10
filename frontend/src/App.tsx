@@ -2534,6 +2534,51 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     saveShifts(updated)
   }
 
+  const toggleOfficeAttendance = (date: string, memberId: number, memberName: string) => {
+    // オフィス出勤シフトが既に存在するかチェック
+    const existingOfficeShift = shifts.find(
+      s => s.date === date && s.member_id === memberId && s.location_id === -1
+    )
+
+    // その他の活動やアドバイザーの場合はオフィス出勤を追加できない
+    const memberShiftsOnDate = shifts.filter(
+      s => s.date === date && s.member_id === memberId && s.location_id !== -1
+    )
+    const hasOtherOrAdvisor = memberShiftsOnDate.some(
+      s => s.is_other === true || s.location_id === -2
+    )
+
+    if (hasOtherOrAdvisor && !existingOfficeShift) {
+      alert('その他の活動やアドバイザーの日はオフィス出勤を追加できません')
+      return
+    }
+
+    let updated: any[]
+    if (existingOfficeShift) {
+      // オフィス出勤を削除
+      updated = shifts.filter(s => s.id !== existingOfficeShift.id)
+    } else {
+      // オフィス出勤を追加
+      const newOfficeShift = {
+        id: Date.now(),
+        member_id: memberId,
+        member_name: memberName,
+        location_id: -1,
+        location_name: 'オフィス',
+        is_other: false,
+        date: date,
+        start_time: null,
+        end_time: null,
+        notes: null,
+        status: '提出済み',
+        created_at: new Date().toISOString()
+      }
+      updated = [...shifts, newOfficeShift]
+    }
+
+    saveShifts(updated)
+  }
+
   const toggleShiftSelection = (id: number) => {
     if (selectedShiftsForDelete.includes(id)) {
       setSelectedShiftsForDelete(selectedShiftsForDelete.filter(shiftId => shiftId !== id))
@@ -3108,6 +3153,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                   <th className="col-date">日付</th>
                   <th className="col-member">メンバー</th>
                   <th className="col-location">勤務地</th>
+                  <th className="col-office">オフィス出勤</th>
                   <th className="col-time">時間</th>
                   <th className="col-notes">備考</th>
                   <th className="col-actions">操作</th>
@@ -3171,23 +3217,31 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                         </td>
                         <td className="col-location">
                           <div className="location-tags">
-                            {allLocations.map((loc: any, i: number) => (
+                            {memberShifts.map((loc: any, i: number) => (
                               <span
                                 key={i}
                                 className={`location-tag ${
-                                  loc.location_id === -1
-                                    ? 'tag-office'
-                                    : loc.is_other
+                                  loc.is_other
                                     ? 'tag-other'
                                     : loc.location_id === -2
                                     ? 'tag-advisor'
                                     : `tag-location-${loc.location_id % 10}`
                                 }`}
                               >
-                                {loc.location_id === -1 ? '🏢' : loc.is_other ? '📝' : loc.location_id === -2 ? '💼' : '🏢'} {loc.location_name}
+                                {loc.is_other ? '📝' : loc.location_id === -2 ? '💼' : '🏢'} {loc.location_name}
                               </span>
                             ))}
                           </div>
+                        </td>
+                        <td className="col-office">
+                          {!mainShift.is_other && mainShift.location_id !== -2 && (
+                            <input
+                              type="checkbox"
+                              checked={hasOffice}
+                              onChange={() => toggleOfficeAttendance(date, Number(memberId), mainShift.member_name)}
+                              title={hasOffice ? 'オフィス出勤を解除' : 'オフィス出勤を追加'}
+                            />
+                          )}
                         </td>
                         <td className="col-time">
                           {mainShift.start_time && mainShift.end_time ? (
