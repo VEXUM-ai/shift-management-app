@@ -3379,16 +3379,28 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
   }, [])
 
   const loadShifts = () => {
-    const stored = safeLocalStorageGet(STORAGE_KEYS.SHIFTS)
-    if (stored) {
-      setShifts(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setShifts(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading shifts:', error)
+      setShifts([])
     }
   }
 
   const loadMembers = () => {
-    const stored = safeLocalStorageGet(STORAGE_KEYS.MEMBERS)
-    if (stored) {
-      setMembers(JSON.parse(stored))
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMembers(Array.isArray(parsed) ? parsed : [])
+      }
+    } catch (error) {
+      console.error('Error loading members:', error)
+      setMembers([])
     }
   }
 
