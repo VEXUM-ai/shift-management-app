@@ -3627,7 +3627,7 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
   // フィルタリング済みメンバー（個人ページの場合）
   const displayMembers = selectedMemberId
     ? members.filter((m: any) => m.id === selectedMemberId)
-    : members.filter((m: any) => !m.is_admin) // 管理者以外を表示
+    : members // すべてのメンバーを表示
 
   return (
     <div className="section">
