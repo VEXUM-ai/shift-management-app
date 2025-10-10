@@ -340,6 +340,7 @@ function MemberManagement() {
   const [hourlyWage, setHourlyWage] = useState('')
   const [fixedSalary, setFixedSalary] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdvisor, setIsAdvisor] = useState(false)
   const [editingMember, setEditingMember] = useState<any>(null)
 
   useEffect(() => {
@@ -374,6 +375,16 @@ function MemberManagement() {
     if (!email) {
       alert('メールアドレスを入力してください')
       return
+    }
+
+    // 名前での重複チェック（同じ名前での再登録を防止）
+    const nameExists = members.some(m =>
+      m.name === name && (!editingMember || m.id !== editingMember.id)
+    )
+    if (nameExists) {
+      if (!confirm(`「${name}」は既に登録されています。同じ名前で登録すると混乱の原因になります。\n\n本当に登録しますか？`)) {
+        return
+      }
     }
 
     // メールアドレスの重複チェック
@@ -428,6 +439,7 @@ function MemberManagement() {
               hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
               fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
               is_admin: isAdmin,
+              is_advisor: isAdvisor,
             }
           : m
       )
@@ -451,6 +463,7 @@ function MemberManagement() {
         hourly_wage: salaryType === 'hourly' ? parseFloat(hourlyWage) : 0,
         fixed_salary: salaryType === 'fixed' ? parseFloat(fixedSalary) : 0,
         is_admin: isAdmin,
+        is_advisor: isAdvisor,
         created_at: new Date().toISOString()
       }
 
@@ -468,6 +481,7 @@ function MemberManagement() {
     setFixedSalary('')
     setSalaryType('hourly')
     setIsAdmin(false)
+    setIsAdvisor(false)
   }
 
   const editMember = (member: any) => {
@@ -481,6 +495,7 @@ function MemberManagement() {
     setHourlyWage(member.salary_type === 'hourly' ? String(member.hourly_wage || '') : '')
     setFixedSalary(member.salary_type === 'fixed' ? String(member.fixed_salary || '') : '')
     setIsAdmin(member.is_admin || false)
+    setIsAdvisor(member.is_advisor || false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -495,6 +510,7 @@ function MemberManagement() {
     setFixedSalary('')
     setSalaryType('hourly')
     setIsAdmin(false)
+    setIsAdvisor(false)
   }
 
   const deleteMember = (id: number) => {
@@ -713,6 +729,23 @@ function MemberManagement() {
           </div>
         </div>
 
+        <div className="form-row">
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+              <input
+                type="checkbox"
+                checked={isAdvisor}
+                onChange={(e) => setIsAdvisor(e.target.checked)}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span>🎓 アドバイザー（常駐先に所属せず、オフィス出勤も可能）</span>
+            </label>
+            <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '5px', fontSize: '14px', color: '#856404' }}>
+              💡 アドバイザーにチェックを入れると、シフト登録時に「オフィス出勤」を選択できるようになります
+            </div>
+          </div>
+        </div>
+
         <div className="form-actions">
           <button onClick={addMember} className="submit-btn">
             {editingMember ? '💾 更新' : '➕ メンバー追加'}
@@ -754,7 +787,7 @@ function MemberManagement() {
               <th>給与形態</th>
               <th>給与額</th>
               <th>オフィス交通費</th>
-              <th>管理権限</th>
+              <th>区分</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -776,11 +809,17 @@ function MemberManagement() {
                 </td>
                 <td>¥{(member.office_transport_fee || 0).toLocaleString('ja-JP')}/日</td>
                 <td>
-                  {member.is_admin ? (
-                    <span style={{ color: '#667eea', fontWeight: 'bold' }}>👔 管理者</span>
-                  ) : (
-                    <span style={{ color: '#999' }}>-</span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {member.is_admin && (
+                      <span style={{ color: '#667eea', fontWeight: 'bold' }}>👔 管理者</span>
+                    )}
+                    {member.is_advisor && (
+                      <span style={{ color: '#f39c12', fontWeight: 'bold' }}>🎓 アドバイザー</span>
+                    )}
+                    {!member.is_admin && !member.is_advisor && (
+                      <span style={{ color: '#999' }}>-</span>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <button className="edit-btn" onClick={() => editMember(member)}>✏️ 編集</button>
