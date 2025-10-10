@@ -301,6 +301,12 @@ function App() {
           シフト一覧
         </button>
         <button
+          className={activeTab === 'office' ? 'active' : ''}
+          onClick={() => setActiveTab('office')}
+        >
+          オフィス出勤表
+        </button>
+        <button
           className={activeTab === 'attendance' ? 'active' : ''}
           onClick={() => setActiveTab('attendance')}
         >
@@ -321,6 +327,7 @@ function App() {
         {activeTab === 'locations' && userRole === 'admin' && <LocationManagement />}
         {activeTab === 'shift' && <ShiftManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'shiftlist' && <ShiftListView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
+        {activeTab === 'office' && <OfficeAttendanceView selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'attendance' && <AttendanceManagement selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
         {activeTab === 'salary' && userRole === 'admin' && <SalaryCalculation selectedMemberId={selectedMemberId} currentMemberName={currentMember?.name} />}
       </main>
@@ -3289,6 +3296,174 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
               <button onClick={cancelEditShiftInfo} className="cancel-btn">キャンセル</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// オフィス出勤表
+function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
+  const [shifts, setShifts] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [selectedMonth, setSelectedMonth] = useState('')
+
+  useEffect(() => {
+    loadShifts()
+    loadMembers()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedMonth) {
+      const today = new Date()
+      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      setSelectedMonth(currentMonth)
+    }
+  }, [])
+
+  const loadShifts = () => {
+    const stored = safeLocalStorageGet(STORAGE_KEYS.SHIFTS)
+    if (stored) {
+      setShifts(JSON.parse(stored))
+    }
+  }
+
+  const loadMembers = () => {
+    const stored = safeLocalStorageGet(STORAGE_KEYS.MEMBERS)
+    if (stored) {
+      setMembers(JSON.parse(stored))
+    }
+  }
+
+  // オフィス出勤のみをフィルタリング
+  const officeShifts = shifts.filter(s => s.location_id === -1)
+
+  // 月でフィルタリング
+  const filteredShifts = selectedMonth
+    ? officeShifts.filter(s => s.date.startsWith(selectedMonth))
+    : officeShifts
+
+  // 個人ページの場合はメンバーでフィルタリング
+  const displayShifts = selectedMemberId
+    ? filteredShifts.filter(s => s.member_id === selectedMemberId)
+    : filteredShifts
+
+  // 日付ごとにグループ化
+  const groupedByDate = displayShifts.reduce((acc: any, shift: any) => {
+    if (!acc[shift.date]) {
+      acc[shift.date] = []
+    }
+    acc[shift.date].push(shift)
+    return acc
+  }, {})
+
+  const exportCSV = () => {
+    if (displayShifts.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    const header = ['日付', 'メンバー', '開始時間', '終了時間', '備考', 'ステータス']
+    const rows = displayShifts
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(s => [
+        s.date,
+        s.member_name,
+        s.start_time || '',
+        s.end_time || '',
+        s.notes || '',
+        s.status
+      ])
+
+    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `office_attendance_${selectedMonth}.csv`
+    link.click()
+  }
+
+  return (
+    <div className="section">
+      <h2>🏢 オフィス出勤表{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
+      {selectedMemberId && currentMemberName && (
+        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+          👤 {currentMemberName}さんのオフィス出勤のみを表示しています
+        </div>
+      )}
+
+      <div className="filter-section">
+        <h3>📊 オフィス出勤確認</h3>
+        <div className="filter-bar">
+          <div className="form-group">
+            <label>月で絞り込み</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
+        </div>
+      </div>
+
+      {Object.keys(groupedByDate).length === 0 ? (
+        <p className="no-data">オフィス出勤が登録されていません</p>
+      ) : (
+        <div className="simple-shift-table">
+          <table className="shifts-list-table">
+            <thead>
+              <tr>
+                <th className="col-date">日付</th>
+                <th className="col-member">メンバー</th>
+                <th className="col-time">時間</th>
+                <th className="col-notes">備考</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(groupedByDate).sort().map((date) => {
+                const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]
+                const dayClass = new Date(date).getDay() === 0 ? 'sunday' : new Date(date).getDay() === 6 ? 'saturday' : 'weekday'
+
+                return groupedByDate[date].map((shift: any, idx: number) => (
+                  <tr key={`${date}-${shift.id}`} className={dayClass}>
+                    <td className={`col-date ${dayClass}`}>
+                      {idx === 0 && (
+                        <>
+                          <div className="date-text">{date}</div>
+                          <div className={`day-text ${dayClass}`}>({dayOfWeek})</div>
+                        </>
+                      )}
+                    </td>
+                    <td className="col-member">
+                      <span className="member-name">{shift.member_name}</span>
+                    </td>
+                    <td className="col-time">
+                      {shift.start_time && shift.end_time ? (
+                        <span className="time-range">
+                          {shift.start_time} - {shift.end_time}
+                        </span>
+                      ) : shift.start_time ? (
+                        <span className="time-range">{shift.start_time} -</span>
+                      ) : shift.end_time ? (
+                        <span className="time-range">- {shift.end_time}</span>
+                      ) : (
+                        <span className="time-empty">-</span>
+                      )}
+                    </td>
+                    <td className="col-notes">
+                      {shift.notes ? (
+                        <span className="notes-text">{shift.notes}</span>
+                      ) : (
+                        <span className="notes-empty">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
