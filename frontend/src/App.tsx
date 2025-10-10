@@ -2458,10 +2458,6 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
   const [editNotes, setEditNotes] = useState('')
-  const [editingOfficeShift, setEditingOfficeShift] = useState<any>(null)
-  const [officeStartTime, setOfficeStartTime] = useState('')
-  const [officeEndTime, setOfficeEndTime] = useState('')
-  const [officeNotes, setOfficeNotes] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -2552,95 +2548,37 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
       return
     }
 
+    let updated: any[]
     if (hasOffice) {
-      // 既存のオフィス出勤を編集
+      // オフィス出勤を削除
       const existingOfficeShift = shifts.find(
         s => s.date === date && s.member_id === memberId && s.location_id === -1
       )
       if (existingOfficeShift) {
-        openEditOfficeShift(existingOfficeShift)
+        updated = shifts.filter(s => s.id !== existingOfficeShift.id)
+      } else {
+        return
       }
     } else {
-      // 新規オフィス出勤を追加（モーダル表示）
+      // 新規オフィス出勤を追加（時間未定で登録）
       const newOfficeShift = {
-        id: null, // 新規作成用
+        id: Date.now(),
         member_id: memberId,
         member_name: memberName,
         location_id: -1,
         location_name: 'オフィス',
         is_other: false,
         date: date,
-        start_time: '',
-        end_time: '',
-        notes: '',
-        status: '提出済み'
-      }
-      openEditOfficeShift(newOfficeShift)
-    }
-  }
-
-  const openEditOfficeShift = (officeShift: any) => {
-    setEditingOfficeShift(officeShift)
-    setOfficeStartTime(officeShift.start_time || '')
-    setOfficeEndTime(officeShift.end_time || '')
-    setOfficeNotes(officeShift.notes || '')
-  }
-
-  const saveOfficeShift = () => {
-    if (!editingOfficeShift) return
-
-    let updated: any[]
-    if (editingOfficeShift.id === null) {
-      // 新規作成
-      const newOfficeShift = {
-        id: Date.now(),
-        member_id: editingOfficeShift.member_id,
-        member_name: editingOfficeShift.member_name,
-        location_id: -1,
-        location_name: 'オフィス',
-        is_other: false,
-        date: editingOfficeShift.date,
-        start_time: officeStartTime || null,
-        end_time: officeEndTime || null,
-        notes: officeNotes || null,
+        start_time: null,
+        end_time: null,
+        notes: null,
         status: '提出済み',
         created_at: new Date().toISOString()
       }
       updated = [...shifts, newOfficeShift]
-    } else {
-      // 既存を更新
-      updated = shifts.map(s =>
-        s.id === editingOfficeShift.id
-          ? {
-              ...s,
-              start_time: officeStartTime || null,
-              end_time: officeEndTime || null,
-              notes: officeNotes || null,
-              updated_at: new Date().toISOString()
-            }
-          : s
-      )
     }
 
     saveShifts(updated)
-    cancelEditOfficeShift()
-  }
-
-  const deleteOfficeShift = () => {
-    if (!editingOfficeShift || editingOfficeShift.id === null) return
-
-    if (!confirm('オフィス出勤を削除しますか？')) return
-
-    const updated = shifts.filter(s => s.id !== editingOfficeShift.id)
-    saveShifts(updated)
-    cancelEditOfficeShift()
-  }
-
-  const cancelEditOfficeShift = () => {
-    setEditingOfficeShift(null)
-    setOfficeStartTime('')
-    setOfficeEndTime('')
-    setOfficeNotes('')
   }
 
   const toggleShiftSelection = (id: number) => {
@@ -3303,7 +3241,7 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                               type="checkbox"
                               checked={hasOffice}
                               onChange={() => toggleOfficeAttendance(date, Number(memberId), mainShift.member_name, hasOffice)}
-                              title={hasOffice ? 'オフィス出勤を編集' : 'オフィス出勤を追加'}
+                              title={hasOffice ? 'オフィス出勤を解除' : 'オフィス出勤を追加'}
                             />
                           )}
                         </td>
@@ -3474,57 +3412,6 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
         </div>
       )}
 
-      {/* オフィス出勤編集モーダル */}
-      {editingOfficeShift && (
-        <div className="modal-overlay" onClick={cancelEditOfficeShift}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>🏢 オフィス出勤 - 時間設定</h3>
-            <div className="modal-guide">
-              <p><strong>メンバー:</strong> {editingOfficeShift.member_name}</p>
-              <p><strong>日付:</strong> {editingOfficeShift.date}</p>
-            </div>
-
-            <div className="time-edit-form">
-              <div className="form-row" style={{ display: 'flex', gap: '15px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>開始時刻</label>
-                  <input
-                    type="time"
-                    value={officeStartTime}
-                    onChange={(e) => setOfficeStartTime(e.target.value)}
-                  />
-                </div>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>終了時刻</label>
-                  <input
-                    type="time"
-                    value={officeEndTime}
-                    onChange={(e) => setOfficeEndTime(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>備考</label>
-                <textarea
-                  value={officeNotes}
-                  onChange={(e) => setOfficeNotes(e.target.value)}
-                  placeholder="例: 午前のみ、会議あり"
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button onClick={saveOfficeShift} className="submit-btn">保存</button>
-              {editingOfficeShift.id !== null && (
-                <button onClick={deleteOfficeShift} className="delete-btn" style={{ backgroundColor: '#dc3545' }}>削除</button>
-              )}
-              <button onClick={cancelEditOfficeShift} className="cancel-btn">キャンセル</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
