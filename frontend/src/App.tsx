@@ -1270,6 +1270,7 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   const [editingShift, setEditingShift] = useState<any>(null)
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
+  const [editNotes, setEditNotes] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState('')
   const [filterMember, setFilterMember] = useState('')
@@ -1283,6 +1284,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   const [editIncludeOffice, setEditIncludeOffice] = useState(false)
   const [editIsOther, setEditIsOther] = useState(false)
   const [editOtherActivity, setEditOtherActivity] = useState('')
+  const [shiftNotes, setShiftNotes] = useState('')
+  const [bulkStartTime, setBulkStartTime] = useState('')
+  const [bulkEndTime, setBulkEndTime] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -1490,8 +1494,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           is_other: true,
           member_type: memberType,
           date,
-          start_time: null,
-          end_time: null,
+          start_time: bulkStartTime || null,
+          end_time: bulkEndTime || null,
+          notes: shiftNotes || null,
           status: '提出済み'
         }
 
@@ -1526,8 +1531,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           is_other: false,
           member_type: memberType,
           date,
-          start_time: null,
-          end_time: null,
+          start_time: bulkStartTime || null,
+          end_time: bulkEndTime || null,
+          notes: shiftNotes || null,
           status: '提出済み'
         }
 
@@ -1564,8 +1570,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             is_other: false,
             member_type: memberType,
             date,
-            start_time: null,
-            end_time: null,
+            start_time: bulkStartTime || null,
+            end_time: bulkEndTime || null,
+            notes: shiftNotes || null,
             status: '提出済み'
           }
 
@@ -1602,8 +1609,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             is_other: false,
             member_type: memberType,
             date,
-            start_time: null,
-            end_time: null,
+            start_time: bulkStartTime || null,
+            end_time: bulkEndTime || null,
+            notes: shiftNotes || null,
             status: '提出済み'
           }
 
@@ -1636,6 +1644,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     setIncludeOffice(false)
     setMemberType('resident')
     setSelectedDates([])
+    setShiftNotes('')
+    setBulkStartTime('')
+    setBulkEndTime('')
 
     if (updatedCount > 0 && addedCount > 0) {
       alert(`シフト登録完了: 新規${addedCount}件、更新${updatedCount}件`)
@@ -1650,19 +1661,21 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     setEditingShift(shift)
     setEditStartTime(shift.start_time || '')
     setEditEndTime(shift.end_time || '')
+    setEditNotes(shift.notes || '')
   }
 
   const saveTime = () => {
     if (!editingShift) return
 
-    if (!editStartTime || !editEndTime) {
-      alert('開始時間と終了時間を入力してください')
-      return
-    }
-
     const updated = shifts.map(s =>
       s.id === editingShift.id
-        ? { ...s, start_time: editStartTime, end_time: editEndTime, updated_at: new Date().toISOString() }
+        ? {
+            ...s,
+            start_time: editStartTime || null,
+            end_time: editEndTime || null,
+            notes: editNotes || null,
+            updated_at: new Date().toISOString()
+          }
         : s
     )
 
@@ -1670,7 +1683,8 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     setEditingShift(null)
     setEditStartTime('')
     setEditEndTime('')
-    alert('時間を設定しました')
+    setEditNotes('')
+    alert('時間と備考を設定しました')
   }
 
   const deleteShift = (id: number) => {
@@ -2269,6 +2283,47 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
           )}
         </div>
       </div>
+
+      {/* 時間と備考の入力 */}
+      {selectedDates.length > 0 && (
+        <div className="registration-step">
+          <div className="step-number">5</div>
+          <div className="step-content">
+            <h3>時間と備考（任意）</h3>
+            <p className="info-text">選択した全ての日付に一括で適用されます</p>
+            <div className="form-row">
+              <div className="form-group">
+                <label>開始時刻</label>
+                <input
+                  type="time"
+                  value={bulkStartTime}
+                  onChange={(e) => setBulkStartTime(e.target.value)}
+                  placeholder="例: 09:00"
+                />
+              </div>
+              <div className="form-group">
+                <label>終了時刻</label>
+                <input
+                  type="time"
+                  value={bulkEndTime}
+                  onChange={(e) => setBulkEndTime(e.target.value)}
+                  placeholder="例: 18:00"
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>備考</label>
+              <textarea
+                value={shiftNotes}
+                onChange={(e) => setShiftNotes(e.target.value)}
+                placeholder="例: リモート勤務、午前のみ、会議あり"
+                rows={3}
+                style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ddd' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="submit-container">
         <button
