@@ -115,6 +115,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authSession, setAuthSession] = useState<AuthSession | null>(null)
   const [members, setMembers] = useState<any[]>([])
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // セッションチェック
   useEffect(() => {
@@ -326,6 +327,15 @@ function App() {
   return (
     <div className="app">
       <header>
+        <button
+          className="hamburger-menu"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="メニュー"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
         <h1>勤怠・シフト管理システム</h1>
         <div className="user-info">
           <span className="current-role">
@@ -343,18 +353,29 @@ function App() {
         </div>
       </header>
 
-      <nav className="tabs">
+      {/* モバイルメニューオーバーレイ */}
+      {isMenuOpen && (
+        <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}></div>
+      )}
+
+      <nav className={`tabs ${isMenuOpen ? 'menu-open' : ''}`}>
         {userRole === 'admin' && (
           <>
             <button
               className={activeTab === 'members' ? 'active' : ''}
-              onClick={() => setActiveTab('members')}
+              onClick={() => {
+                setActiveTab('members')
+                setIsMenuOpen(false)
+              }}
             >
               メンバー管理
             </button>
             <button
               className={activeTab === 'locations' ? 'active' : ''}
-              onClick={() => setActiveTab('locations')}
+              onClick={() => {
+                setActiveTab('locations')
+                setIsMenuOpen(false)
+              }}
             >
               クライアント先管理
             </button>
@@ -362,38 +383,56 @@ function App() {
         )}
         <button
           className={activeTab === 'shift' ? 'active' : ''}
-          onClick={() => setActiveTab('shift')}
+          onClick={() => {
+            setActiveTab('shift')
+            setIsMenuOpen(false)
+          }}
         >
           シフト登録
         </button>
         <button
           className={activeTab === 'shiftlist' ? 'active' : ''}
-          onClick={() => setActiveTab('shiftlist')}
+          onClick={() => {
+            setActiveTab('shiftlist')
+            setIsMenuOpen(false)
+          }}
         >
           シフト一覧
         </button>
         <button
           className={activeTab === 'office' ? 'active' : ''}
-          onClick={() => setActiveTab('office')}
+          onClick={() => {
+            setActiveTab('office')
+            setIsMenuOpen(false)
+          }}
         >
           オフィス出勤表
         </button>
         <button
           className={activeTab === 'clientmeeting' ? 'active' : ''}
-          onClick={() => setActiveTab('clientmeeting')}
+          onClick={() => {
+            setActiveTab('clientmeeting')
+            setIsMenuOpen(false)
+          }}
         >
           クライアント会議
         </button>
         <button
           className={activeTab === 'attendance' ? 'active' : ''}
-          onClick={() => setActiveTab('attendance')}
+          onClick={() => {
+            setActiveTab('attendance')
+            setIsMenuOpen(false)
+          }}
         >
           勤怠管理
         </button>
         {userRole === 'admin' && (
           <button
             className={activeTab === 'salary' ? 'active' : ''}
-            onClick={() => setActiveTab('salary')}
+            onClick={() => {
+              setActiveTab('salary')
+              setIsMenuOpen(false)
+            }}
           >
             給与計算
           </button>

@@ -50,6 +50,39 @@ header {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+  position: relative;
+}
+
+/* ハンバーガーメニューボタン */
+.hamburger-menu {
+  display: none;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 1001;
+}
+
+.hamburger-menu span {
+  width: 100%;
+  height: 3px;
+  background: #4f46e5;
+  border-radius: 10px;
+  transition: all 0.3s;
+}
+
+@media (max-width: 768px) {
+  .hamburger-menu {
+    display: flex;
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
 }
 
 header h1 {
@@ -69,20 +102,31 @@ header h1 {
 
 @media (max-width: 768px) {
   header {
-    padding: 15px;
+    padding: 15px 15px 15px 55px; /* 左側にハンバーガーメニュー分のスペース */
     flex-direction: column;
   }
 
   header h1 {
-    font-size: 20px;
+    font-size: 18px;
     width: 100%;
     text-align: center;
+    padding-right: 0;
   }
 
   .user-info {
     width: 100%;
     justify-content: center;
     gap: 10px;
+  }
+
+  .current-role {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .switch-role-btn {
+    font-size: 12px;
+    padding: 6px 12px;
   }
 }
 
@@ -146,39 +190,77 @@ header h1 {
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
-/* スマホ時はボトムナビゲーション */
+/* メニューオーバーレイ */
+.menu-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+}
+
+@media (max-width: 768px) {
+  .menu-overlay {
+    display: block;
+  }
+}
+
+/* スマホ時はサイドドロワー */
 @media (max-width: 768px) {
   .tabs {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
     margin: 0;
-    padding: 8px 10px;
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding: 80px 20px 20px 20px;
     background: white;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 999;
-    justify-content: space-around;
-    gap: 4px;
-    border-top: 1px solid #e0e0e0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+    overflow-y: auto;
+    transition: left 0.3s ease-in-out;
+  }
+
+  .tabs.menu-open {
+    left: 0;
   }
 
   .tabs button {
-    flex: 1;
-    padding: 8px 4px;
-    font-size: 11px;
-    border-radius: 6px;
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 15px;
+    border-radius: 8px;
+    text-align: left;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    min-height: 56px;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: auto;
+    transition: all 0.2s;
+  }
+
+  .tabs button:hover {
+    background: #f5f5f5;
+    transform: translateX(4px);
   }
 
   .tabs button.active {
-    background: rgba(102, 126, 234, 0.1);
-    color: #4f46e5;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    transform: translateX(0);
+  }
+
+  .tabs button.active:hover {
+    background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+    transform: translateX(0);
   }
 }
 
