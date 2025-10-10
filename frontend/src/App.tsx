@@ -2445,6 +2445,9 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   const [editIncludeOffice, setEditIncludeOffice] = useState(false)
   const [editIsOther, setEditIsOther] = useState(false)
   const [editOtherActivity, setEditOtherActivity] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   useEffect(() => {
     loadShifts()
@@ -2597,6 +2600,9 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     setEditIsOther(shift.is_other || false)
     setEditOtherActivity(shift.is_other ? shift.location_name.replace('その他: ', '') : '')
     setEditIncludeOffice(false)
+    setEditStartTime(shift.start_time || '')
+    setEditEndTime(shift.end_time || '')
+    setEditNotes(shift.notes || '')
   }
 
   const cancelEditShiftInfo = () => {
@@ -2606,6 +2612,9 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
     setEditIncludeOffice(false)
     setEditIsOther(false)
     setEditOtherActivity('')
+    setEditStartTime('')
+    setEditEndTime('')
+    setEditNotes('')
   }
 
   const saveEditShiftInfo = () => {
@@ -2641,7 +2650,11 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
       member_name: member.name,
       location_id: locationId,
       location_name: locationName,
-      is_other: editIsOther
+      is_other: editIsOther,
+      start_time: editStartTime || null,
+      end_time: editEndTime || null,
+      notes: editNotes || null,
+      updated_at: new Date().toISOString()
     }
 
     let updated = shifts.map(s => s.id === editingShiftInfo.id ? updatedShift : s)
@@ -3289,10 +3302,39 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
                   />
                 </div>
               )}
+
+              <div className="form-row" style={{ display: 'flex', gap: '15px' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>開始時刻</label>
+                  <input
+                    type="time"
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>終了時刻</label>
+                  <input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>備考</label>
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="例: リモート勤務、午前のみ、会議あり"
+                  rows={3}
+                />
+              </div>
             </div>
 
             <div className="modal-actions">
-              <button onClick={saveShiftInfo} className="submit-btn">保存</button>
+              <button onClick={saveEditShiftInfo} className="submit-btn">保存</button>
               <button onClick={cancelEditShiftInfo} className="cancel-btn">キャンセル</button>
             </div>
           </div>
