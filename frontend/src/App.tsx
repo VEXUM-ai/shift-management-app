@@ -1703,6 +1703,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
   const openEditShiftInfo = (shift: any) => {
     setEditingShiftInfo(shift)
     setEditMember(String(shift.member_id))
+    setEditStartTime(shift.start_time || '')
+    setEditEndTime(shift.end_time || '')
+    setEditNotes(shift.notes || '')
 
     if (shift.is_other) {
       setEditIsOther(true)
@@ -1770,7 +1773,11 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
             member_name: member.name,
             location_id: locationData.id,
             location_name: locationData.name,
-            is_other: editIsOther
+            is_other: editIsOther,
+            start_time: editStartTime || null,
+            end_time: editEndTime || null,
+            notes: editNotes || null,
+            updated_at: new Date().toISOString()
           }
         : s
     )
@@ -1822,6 +1829,9 @@ function ShiftManagement({ selectedMemberId, currentMemberName }: { selectedMemb
     setEditIncludeOffice(false)
     setEditIsOther(false)
     setEditOtherActivity('')
+    setEditStartTime('')
+    setEditEndTime('')
+    setEditNotes('')
   }
 
   const toggleShiftSelection = (id: number) => {
