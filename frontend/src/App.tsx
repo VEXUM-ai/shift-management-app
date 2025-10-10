@@ -2618,13 +2618,18 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   }
 
   const saveEditShiftInfo = () => {
-    if (!editMember || !editLocation) {
-      alert('メンバーと勤務地を選択してください')
+    if (!editMember) {
+      alert('メンバーを選択してください')
       return
     }
 
     if (editIsOther && !editOtherActivity) {
       alert('活動内容を入力してください')
+      return
+    }
+
+    if (!editIsOther && !editLocation) {
+      alert('勤務地を選択してください')
       return
     }
 
@@ -3436,7 +3441,7 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
       )}
 
       <div className="filter-section">
-        <h3>📊 オフィス出勤確認</h3>
+        <h3>📊 オフィス出勤確認 ({displayShifts.length}件)</h3>
         <div className="filter-bar">
           <div className="form-group">
             <label>月で絞り込み</label>
