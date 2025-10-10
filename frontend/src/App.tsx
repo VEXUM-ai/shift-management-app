@@ -3534,6 +3534,17 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
   const [shifts, setShifts] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [editingOfficeShift, setEditingOfficeShift] = useState<any>(null)
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
+
+  const timeSlots = [
+    { value: '10:00', label: '10時' },
+    { value: '12:00', label: '12時' },
+    { value: '14:00', label: '14時' },
+    { value: '16:00', label: '16時' },
+    { value: '18:00', label: '18時' },
+    { value: '20:00', label: '20時' }
+  ]
 
   useEffect(() => {
     loadShifts()
@@ -3574,6 +3585,116 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     }
   }
 
+  const saveShifts = (data: any[]) => {
+    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(data))) {
+      setShifts(data)
+    }
+  }
+
+  const openOfficeShiftModal = (date: string, memberId: number, memberName: string) => {
+    // 既存のオフィス出勤を探す
+    const existingOffice = shifts.find(
+      s => s.date === date && s.member_id === memberId && s.location_id === -1
+    )
+
+    setEditingOfficeShift({
+      id: existingOffice?.id || null,
+      member_id: memberId,
+      member_name: memberName,
+      date: date,
+      start_time: existingOffice?.start_time || '',
+      notes: existingOffice?.notes || ''
+    })
+    setSelectedTimeSlot(existingOffice?.start_time || '')
+  }
+
+  const saveOfficeShift = () => {
+    if (!editingOfficeShift) return
+    if (!selectedTimeSlot) {
+      alert('時間帯を選択してください')
+      return
+    }
+
+    let updated: any[]
+    if (editingOfficeShift.id === null) {
+      // 新規作成
+      const newOfficeShift = {
+        id: Date.now(),
+        member_id: editingOfficeShift.member_id,
+        member_name: editingOfficeShift.member_name,
+        location_id: -1,
+        location_name: 'オフィス',
+        is_other: false,
+        date: editingOfficeShift.date,
+        start_time: selectedTimeSlot,
+        end_time: null,
+        notes: editingOfficeShift.notes || null,
+        status: '提出済み',
+        created_at: new Date().toISOString()
+      }
+      updated = [...shifts, newOfficeShift]
+    } else {
+      // 既存を更新
+      updated = shifts.map(s =>
+        s.id === editingOfficeShift.id
+          ? {
+              ...s,
+              start_time: selectedTimeSlot,
+              notes: editingOfficeShift.notes || null,
+              updated_at: new Date().toISOString()
+            }
+          : s
+      )
+    }
+
+    saveShifts(updated)
+    cancelOfficeShiftModal()
+  }
+
+  const deleteOfficeShift = () => {
+    if (!editingOfficeShift || editingOfficeShift.id === null) return
+    if (!confirm('オフィス出勤を削除しますか？')) return
+
+    const updated = shifts.filter(s => s.id !== editingOfficeShift.id)
+    saveShifts(updated)
+    cancelOfficeShiftModal()
+  }
+
+  const cancelOfficeShiftModal = () => {
+    setEditingOfficeShift(null)
+    setSelectedTimeSlot('')
+  }
+
+  // カレンダーの日付を生成
+  const generateCalendarDates = () => {
+    if (!selectedMonth) return []
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const lastDay = new Date(year, month, 0)
+    const daysInMonth = lastDay.getDate()
+    const startDayOfWeek = firstDay.getDay()
+
+    const calendar: any[] = []
+
+    // 月の最初の曜日まで空白を追加
+    for (let i = 0; i < startDayOfWeek; i++) {
+      calendar.push({ isEmpty: true })
+    }
+
+    // 各日付のデータを集約
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      calendar.push({
+        date: dateStr,
+        day,
+        dayOfWeek: new Date(dateStr).getDay()
+      })
+    }
+
+    return calendar
+  }
+
   // オフィス出勤のみをフィルタリング
   const officeShifts = shifts.filter(s => s.location_id === -1)
 
@@ -3586,15 +3707,6 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
   const displayShifts = selectedMemberId
     ? filteredShifts.filter(s => s.member_id === selectedMemberId)
     : filteredShifts
-
-  // 日付ごとにグループ化
-  const groupedByDate = displayShifts.reduce((acc: any, shift: any) => {
-    if (!acc[shift.date]) {
-      acc[shift.date] = []
-    }
-    acc[shift.date].push(shift)
-    return acc
-  }, {})
 
   const exportCSV = () => {
     if (displayShifts.length === 0) {
@@ -3623,20 +3735,22 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     link.click()
   }
 
+  const calendarDates = generateCalendarDates()
+
+  // フィルタリング済みメンバー（個人ページの場合）
+  const displayMembers = selectedMemberId
+    ? members.filter((m: any) => m.id === selectedMemberId)
+    : members.filter((m: any) => !m.is_admin) // 管理者以外を表示
+
   return (
     <div className="section">
       <h2>🏢 オフィス出勤表{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
-      {selectedMemberId && currentMemberName && (
-        <div className="info-text" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
-          👤 {currentMemberName}さんのオフィス出勤のみを表示しています
-        </div>
-      )}
 
       <div className="filter-section">
-        <h3>📊 オフィス出勤確認 ({displayShifts.length}件)</h3>
+        <h3>📊 オフィス出勤管理</h3>
         <div className="filter-bar">
           <div className="form-group">
-            <label>月で絞り込み</label>
+            <label>月を選択</label>
             <input
               type="month"
               value={selectedMonth}
@@ -3645,64 +3759,123 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
           </div>
           <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
         </div>
+        <p className="info-text">クリックして時間帯を選択してください（10時/12時/14時/16時/18時/20時）</p>
       </div>
 
-      {Object.keys(groupedByDate).length === 0 ? (
-        <p className="no-data">オフィス出勤が登録されていません</p>
-      ) : (
-        <div className="simple-shift-table">
-          <table className="shifts-list-table">
-            <thead>
-              <tr>
-                <th className="col-date">日付</th>
-                <th className="col-member">メンバー</th>
-                <th className="col-time">時間</th>
-                <th className="col-notes">備考</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.keys(groupedByDate).sort().map((date) => {
-                const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(date).getDay()]
-                const dayClass = new Date(date).getDay() === 0 ? 'sunday' : new Date(date).getDay() === 6 ? 'saturday' : 'weekday'
-
-                return groupedByDate[date].map((shift: any, idx: number) => (
-                  <tr key={`${date}-${shift.id}`} className={dayClass}>
-                    <td className={`col-date ${dayClass}`}>
-                      {idx === 0 && (
-                        <>
-                          <div className="date-text">{date}</div>
-                          <div className={`day-text ${dayClass}`}>({dayOfWeek})</div>
-                        </>
-                      )}
-                    </td>
-                    <td className="col-member">
-                      <span className="member-name">{shift.member_name}</span>
-                    </td>
-                    <td className="col-time">
-                      {shift.start_time && shift.end_time ? (
-                        <span className="time-range">
-                          {shift.start_time} - {shift.end_time}
-                        </span>
-                      ) : shift.start_time ? (
-                        <span className="time-range">{shift.start_time} -</span>
-                      ) : shift.end_time ? (
-                        <span className="time-range">- {shift.end_time}</span>
-                      ) : (
-                        <span className="time-empty">-</span>
-                      )}
-                    </td>
-                    <td className="col-notes">
-                      {shift.notes ? (
-                        <span className="notes-text">{shift.notes}</span>
-                      ) : (
-                        <span className="notes-empty">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+      {/* カレンダービュー */}
+      <div className="office-calendar" style={{ marginTop: '20px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}>メンバー</th>
+              {calendarDates.map((cell, idx) => {
+                if (cell.isEmpty) return <th key={`empty-${idx}`} style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}></th>
+                const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+                return (
+                  <th key={cell.date} style={{
+                    border: '1px solid #ddd',
+                    padding: '8px',
+                    backgroundColor: '#f5f5f5',
+                    color: dayClass === 'sunday' ? '#e74c3c' : dayClass === 'saturday' ? '#3498db' : '#333',
+                    fontSize: '0.9em'
+                  }}>
+                    <div>{cell.day}</div>
+                    <div style={{ fontSize: '0.8em' }}>
+                      {['日', '月', '火', '水', '木', '金', '土'][cell.dayOfWeek]}
+                    </div>
+                  </th>
+                )
               })}
-            </tbody>
-          </table>
+            </tr>
+          </thead>
+          <tbody>
+            {displayMembers.map((member: any) => (
+              <tr key={member.id}>
+                <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
+                  {member.name}
+                </td>
+                {calendarDates.map((cell, idx) => {
+                  if (cell.isEmpty) return <td key={`empty-${idx}`} style={{ border: '1px solid #ddd', backgroundColor: '#f9f9f9' }}></td>
+
+                  const officeShift = shifts.find(
+                    (s: any) => s.date === cell.date && s.member_id === member.id && s.location_id === -1
+                  )
+
+                  const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+
+                  return (
+                    <td
+                      key={cell.date}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '4px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: officeShift ? '#d4edda' : dayClass === 'sunday' ? '#ffebee' : dayClass === 'saturday' ? '#e3f2fd' : 'white',
+                        position: 'relative'
+                      }}
+                      onClick={() => openOfficeShiftModal(cell.date, member.id, member.name)}
+                      title={officeShift ? `オフィス出勤: ${officeShift.start_time}` : 'クリックして追加'}
+                    >
+                      {officeShift && (
+                        <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#155724' }}>
+                          🏢 {officeShift.start_time}
+                        </div>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* オフィス出勤編集モーダル */}
+      {editingOfficeShift && (
+        <div className="modal-overlay" onClick={cancelOfficeShiftModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>🏢 オフィス出勤 - 時間帯選択</h3>
+            <div className="modal-guide">
+              <p><strong>メンバー:</strong> {editingOfficeShift.member_name}</p>
+              <p><strong>日付:</strong> {editingOfficeShift.date}</p>
+            </div>
+
+            <div className="time-edit-form">
+              <div className="form-group">
+                <label>出勤時間帯 <span className="required">*必須</span></label>
+                <select
+                  value={selectedTimeSlot}
+                  onChange={(e) => setSelectedTimeSlot(e.target.value)}
+                  style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+                >
+                  <option value="">選択してください</option>
+                  {timeSlots.map(slot => (
+                    <option key={slot.value} value={slot.value}>{slot.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>備考</label>
+                <textarea
+                  value={editingOfficeShift.notes || ''}
+                  onChange={(e) => setEditingOfficeShift({ ...editingOfficeShift, notes: e.target.value })}
+                  placeholder="例: 午前のみ、会議あり"
+                  rows={3}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={saveOfficeShift} className="submit-btn">保存</button>
+              {editingOfficeShift.id !== null && (
+                <button onClick={deleteOfficeShift} className="delete-btn" style={{ backgroundColor: '#dc3545' }}>削除</button>
+              )}
+              <button onClick={cancelOfficeShiftModal} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
