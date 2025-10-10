@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import './App.css'
 import { Login } from './components/Login'
 import { hashPassword, verifyPassword, isSessionValid } from './utils/auth'
+import AttendanceTable from './components/AttendanceTable'
+import AttendanceEditModal from './components/AttendanceEditModal'
 
 // セッショントークン生成
 const generateSessionToken = (): string => {
@@ -145,20 +147,7 @@ function App() {
       }
     }
 
-    // セッションがない場合は自動的に管理者としてログイン
-    const session: AuthSession = {
-      userId: 0,
-      userName: '管理者（全体）',
-      userEmail: 'admin@system',
-      userRole: 'admin',
-      token: generateSessionToken(),
-      timestamp: new Date().toISOString()
-    }
-
-    safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
-    setAuthSession(session)
-    setUserRole('admin')
-    setIsAuthenticated(true)
+    // セッションがない場合はログイン画面へ
   }, [])
 
   // ログイン処理
@@ -203,6 +192,48 @@ function App() {
     setIsAuthenticated(true)
   }
 
+  // ゲストログイン（名前とパスワード）
+  const handleGuestLogin = async (name: string, password: string) => {
+    const member = members.find(m => m.name === name)
+
+    if (!member) {
+      throw new Error('名前またはパスワードが正しくありません')
+    }
+
+    if (!member.password) {
+      throw new Error('パスワードが設定されていません。管理者にお問い合わせください')
+    }
+
+    // パスワード検証
+    const isValid = await verifyPassword(password, member.password)
+    if (!isValid) {
+      throw new Error('名前またはパスワードが正しくありません')
+    }
+
+    // セッション作成
+    const session: AuthSession = {
+      userId: member.id,
+      userName: member.name,
+      userEmail: member.email,
+      userRole: 'member',
+      token: generateSessionToken(),
+      timestamp: new Date().toISOString()
+    }
+
+    // 最終ログイン時刻を更新
+    const updatedMembers = members.map((m: any) =>
+      m.id === member.id ? { ...m, last_login: session.timestamp } : m
+    )
+    safeLocalStorageSet(STORAGE_KEYS.MEMBERS, JSON.stringify(updatedMembers))
+    setMembers(updatedMembers)
+
+    // セッション保存
+    safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
+    setAuthSession(session)
+    setUserRole(session.userRole)
+    setIsAuthenticated(true)
+  }
+
   // 管理者ログイン（パスワード不要）
   const handleAdminLogin = () => {
     const session: AuthSession = {
@@ -220,6 +251,44 @@ function App() {
     setIsAuthenticated(true)
   }
 
+  // 新規登録
+  const handleRegister = async (name: string, email: string, password: string, transportationCost: number) => {
+    // 名前の重複チェック
+    const existingName = members.find((m: any) => m.name === name)
+    if (existingName) {
+      throw new Error('この名前は既に登録されています')
+    }
+
+    // メールアドレスの重複チェック
+    const existingEmail = members.find((m: any) => m.email === email)
+    if (existingEmail) {
+      throw new Error('このメールアドレスは既に登録されています')
+    }
+
+    // パスワードをハッシュ化
+    const hashedPassword = await hashPassword(password)
+
+    // 新しいメンバーを作成
+    const newMember = {
+      id: Date.now(),
+      name: name,
+      email: email,
+      password: hashedPassword,
+      is_admin: false,
+      hourly_rate: 0,
+      transportation_cost: transportationCost,
+      created_at: new Date().toISOString(),
+      last_login: null
+    }
+
+    // メンバーリストに追加
+    const updatedMembers = [...members, newMember]
+    safeLocalStorageSet(STORAGE_KEYS.MEMBERS, JSON.stringify(updatedMembers))
+    setMembers(updatedMembers)
+
+    alert('登録が完了しました。ゲストログインからログインしてください。')
+  }
+
   // ログアウト
   const logout = () => {
     localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION)
@@ -228,18 +297,20 @@ function App() {
     setUserRole('member')
   }
 
-  // ログイン画面（現在は自動ログイン設定のためコメントアウト）
-  // if (!isAuthenticated) {
-  //   return (
-  //     <ErrorBoundary>
-  //       <Login
-  //         onLogin={handleLogin}
-  //         onAdminLogin={handleAdminLogin}
-  //         showAdminOption={true}
-  //       />
-  //     </ErrorBoundary>
-  //   )
-  // }
+  // ログイン画面
+  if (!isAuthenticated) {
+    return (
+      <ErrorBoundary>
+        <Login
+          onLogin={handleLogin}
+          onGuestLogin={handleGuestLogin}
+          onAdminLogin={handleAdminLogin}
+          onRegister={handleRegister}
+          showAdminOption={true}
+        />
+      </ErrorBoundary>
+    )
+  }
 
   // ログイン済みユーザー情報
   const currentMember = authSession && authSession.userId > 0
@@ -607,7 +678,7 @@ function MemberManagement() {
           <li><strong>基本情報:</strong> メンバーの名前とメールアドレスを入力</li>
           <li><strong>給与形態選択:</strong> 時給制または固定給与制を選択</li>
           <li><strong>給与額設定:</strong> 時給または月額固定給与を入力</li>
-          <li><strong>交通費設定:</strong> オフィスまでの交通費を入力</li>
+          <li><strong>交通費設定:</strong> オフィスまでの交通費（１日あたり２０００円まで）を入力</li>
         </ol>
         <p className="note">💡 常駐先ごとの交通費は「常駐先管理」タブで個別設定できます</p>
       </div>
@@ -3416,36 +3487,27 @@ function ShiftListView({ selectedMemberId, currentMemberName }: { selectedMember
   )
 }
 
-// オフィス出勤表
+/**
+ * オフィス出勤表コンポーネント
+ * 常駐勤務（固定5時間）+ 個別ミーティング申請を管理
+ */
 function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
-  const [shifts, setShifts] = useState<any[]>([])
-  const [members, setMembers] = useState<any[]>([])
-  const [selectedMonth, setSelectedMonth] = useState('')
-  const [editingOfficeShift, setEditingOfficeShift] = useState<any>(null)
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
+  // 状態管理
+  const [shifts, setShifts] = useState<any[]>([]) // シフト一覧
+  const [members, setMembers] = useState<any[]>([]) // メンバー一覧
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false) // モーダル表示状態
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null) // 編集中のメンバーID
+  const [editingDate, setEditingDate] = useState<string | null>(null) // 編集中の日付
 
-  const timeSlots = [
-    { value: '10:00', label: '10時' },
-    { value: '12:00', label: '12時' },
-    { value: '14:00', label: '14時' },
-    { value: '16:00', label: '16時' },
-    { value: '18:00', label: '18時' },
-    { value: '20:00', label: '20時' }
-  ]
-
+  // 初回読み込み
   useEffect(() => {
     loadShifts()
     loadMembers()
   }, [])
 
-  useEffect(() => {
-    if (!selectedMonth) {
-      const today = new Date()
-      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-      setSelectedMonth(currentMonth)
-    }
-  }, [])
-
+  /**
+   * LocalStorageからシフトデータを読み込み
+   */
   const loadShifts = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SHIFTS)
@@ -3459,6 +3521,9 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     }
   }
 
+  /**
+   * LocalStorageからメンバーデータを読み込み
+   */
   const loadMembers = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.MEMBERS)
@@ -3472,299 +3537,187 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
     }
   }
 
-  const saveShifts = (data: any[]) => {
-    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(data))) {
-      setShifts(data)
+  /**
+   * 今週の日付を生成（月曜日から日曜日まで）
+   * @returns 日付配列（YYYY-MM-DD形式）
+   */
+  const getWeekDates = () => {
+    const today = new Date()
+    const currentDay = today.getDay()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1))
+
+    const weekDates: string[] = []
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday)
+      date.setDate(monday.getDate() + i)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      weekDates.push(`${year}-${month}-${day}`)
     }
+    return weekDates
   }
 
-  const openOfficeShiftModal = (date: string, memberId: number, memberName: string) => {
-    // 既存のオフィス出勤を探す
-    const existingOffice = shifts.find(
-      s => s.date === date && s.member_id === memberId && s.location_id === -1
-    )
+  // メンバーデータを変換（個人ページの場合はフィルタリング）
+  const displayMembers = selectedMemberId
+    ? members.filter((m: any) => m.id === selectedMemberId)
+    : members
 
-    setEditingOfficeShift({
-      id: existingOffice?.id || null,
-      member_id: memberId,
-      member_name: memberName,
-      date: date,
-      start_time: existingOffice?.start_time || '',
-      notes: existingOffice?.notes || ''
-    })
-    setSelectedTimeSlot(existingOffice?.start_time || '')
-  }
+  const transformedMembers = displayMembers.map((m: any) => ({
+    id: String(m.id),
+    name: m.name,
+    department: m.department || '未設定',
+    avatar: m.avatar
+  }))
 
-  const saveOfficeShift = () => {
-    if (!editingOfficeShift) return
-    if (!selectedTimeSlot) {
-      alert('時間帯を選択してください')
-      return
-    }
-
-    let updated: any[]
-    if (editingOfficeShift.id === null) {
-      // 新規作成
-      const newOfficeShift = {
-        id: Date.now(),
-        member_id: editingOfficeShift.member_id,
-        member_name: editingOfficeShift.member_name,
-        location_id: -1,
-        location_name: 'オフィス',
-        is_other: false,
-        date: editingOfficeShift.date,
-        start_time: selectedTimeSlot,
-        end_time: null,
-        notes: editingOfficeShift.notes || null,
-        status: '提出済み',
-        created_at: new Date().toISOString()
-      }
-      updated = [...shifts, newOfficeShift]
-    } else {
-      // 既存を更新
-      updated = shifts.map(s =>
-        s.id === editingOfficeShift.id
-          ? {
-              ...s,
-              start_time: selectedTimeSlot,
-              notes: editingOfficeShift.notes || null,
-              updated_at: new Date().toISOString()
-            }
-          : s
-      )
-    }
-
-    saveShifts(updated)
-    cancelOfficeShiftModal()
-  }
-
-  const deleteOfficeShift = () => {
-    if (!editingOfficeShift || editingOfficeShift.id === null) return
-    if (!confirm('オフィス出勤を削除しますか？')) return
-
-    const updated = shifts.filter(s => s.id !== editingOfficeShift.id)
-    saveShifts(updated)
-    cancelOfficeShiftModal()
-  }
-
-  const cancelOfficeShiftModal = () => {
-    setEditingOfficeShift(null)
-    setSelectedTimeSlot('')
-  }
-
-  // カレンダーの日付を生成
-  const generateCalendarDates = () => {
-    if (!selectedMonth) return []
-
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const firstDay = new Date(year, month - 1, 1)
-    const lastDay = new Date(year, month, 0)
-    const daysInMonth = lastDay.getDate()
-    const startDayOfWeek = firstDay.getDay()
-
-    const calendar: any[] = []
-
-    // 月の最初の曜日まで空白を追加
-    for (let i = 0; i < startDayOfWeek; i++) {
-      calendar.push({ isEmpty: true })
-    }
-
-    // 各日付のデータを集約
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      calendar.push({
-        date: dateStr,
-        day,
-        dayOfWeek: new Date(dateStr).getDay()
-      })
-    }
-
-    return calendar
-  }
-
-  // オフィス出勤のみをフィルタリング
-  const officeShifts = shifts.filter(s => s.location_id === -1)
-
-  // 月でフィルタリング
-  const filteredShifts = selectedMonth
-    ? officeShifts.filter(s => s.date.startsWith(selectedMonth))
-    : officeShifts
+  // シフトデータを出勤記録に変換（オフィス出勤のみ）
+  const officeShifts = shifts.filter((s: any) => s.location_id === -1)
 
   // 個人ページの場合はメンバーでフィルタリング
   const displayShifts = selectedMemberId
-    ? filteredShifts.filter(s => s.member_id === selectedMemberId)
-    : filteredShifts
+    ? officeShifts.filter((s: any) => s.member_id === selectedMemberId)
+    : officeShifts
 
-  const exportCSV = () => {
-    if (displayShifts.length === 0) {
-      alert('エクスポートするデータがありません')
-      return
+  const attendanceRecords = displayShifts.map((s: any) => {
+    // ステータスを判定
+    let status: 'office' | 'remote' | 'off' = 'office'
+    if (s.notes?.includes('在宅') || s.notes?.includes('リモート')) {
+      status = 'remote'
+    } else if (s.notes?.includes('休') || s.notes?.includes('有給')) {
+      status = 'off'
     }
 
-    const header = ['日付', 'メンバー', '開始時間', '終了時間', '備考', 'ステータス']
-    const rows = displayShifts
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(s => [
-        s.date,
-        s.member_name,
-        s.start_time || '',
-        s.end_time || '',
-        s.notes || '',
-        s.status
-      ])
+    // 常駐勤務の終了時刻を計算（開始時刻+5時間）
+    const calculateEndTime = (startTime: string): string => {
+      const [hours, minutes] = startTime.split(':').map(Number)
+      const endHours = hours + 5
+      return `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+    }
 
-    const csv = [header, ...rows].map(row => row.join(',')).join('\n')
-    const bom = '\uFEFF'
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `office_attendance_${selectedMonth}.csv`
-    link.click()
+    // ミーティングデータの解析（notes から抽出、または meetings フィールドから）
+    const meetings = s.meetings || []
+
+    return {
+      memberId: String(s.member_id),
+      date: s.date,
+      status,
+      residenceStartTime: s.start_time || undefined,
+      residenceEndTime: s.start_time ? calculateEndTime(s.start_time) : undefined,
+      residenceClient: s.location_name || 'オフィス',
+      meetings: meetings,
+      memo: s.notes || undefined
+    }
+  })
+
+  const weekDates = getWeekDates()
+
+  const handleEditAttendance = (memberId: string, date: string) => {
+    setEditingMemberId(memberId)
+    setEditingDate(date)
+    setIsEditModalOpen(true)
   }
 
-  const calendarDates = generateCalendarDates()
+  const handleSaveAttendance = (data: {
+    residenceStartTime?: string;
+    residenceClient?: string;
+    meetings: any[];
+    memo?: string;
+  }) => {
+    if (!editingMemberId || !editingDate) return
 
-  // フィルタリング済みメンバー（個人ページの場合）
-  const displayMembers = selectedMemberId
-    ? members.filter((m: any) => m.id === selectedMemberId)
-    : members // すべてのメンバーを表示
+    const memberIdNum = parseInt(editingMemberId)
+    const existingShiftIndex = shifts.findIndex(
+      (s: any) => s.member_id === memberIdNum && s.date === editingDate && s.location_id === -1
+    )
+
+    const member = members.find((m: any) => m.id === memberIdNum)
+    const updatedShift = {
+      id: existingShiftIndex >= 0 ? shifts[existingShiftIndex].id : Date.now(),
+      member_id: memberIdNum,
+      member_name: member?.name || '',
+      location_id: -1,
+      location_name: data.residenceClient || 'オフィス',
+      is_other: false,
+      date: editingDate,
+      start_time: data.residenceStartTime || null,
+      end_time: null,
+      notes: data.memo || null,
+      meetings: data.meetings || [],
+      status: '提出済み',
+      created_at: existingShiftIndex >= 0 ? shifts[existingShiftIndex].created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+
+    let updatedShifts: any[]
+    if (existingShiftIndex >= 0) {
+      updatedShifts = shifts.map((s: any, idx: number) =>
+        idx === existingShiftIndex ? updatedShift : s
+      )
+    } else {
+      updatedShifts = [...shifts, updatedShift]
+    }
+
+    if (safeLocalStorageSet(STORAGE_KEYS.SHIFTS, JSON.stringify(updatedShifts))) {
+      setShifts(updatedShifts)
+      setIsEditModalOpen(false)
+      setEditingMemberId(null)
+      setEditingDate(null)
+    }
+  }
+
+  const getCurrentEditingRecord = () => {
+    if (!editingMemberId || !editingDate) return null
+    const memberIdNum = parseInt(editingMemberId)
+    return shifts.find(
+      (s: any) => s.member_id === memberIdNum && s.date === editingDate && s.location_id === -1
+    )
+  }
+
+  const editingRecord = getCurrentEditingRecord()
+  const editingMember = editingMemberId ? members.find((m: any) => String(m.id) === editingMemberId) : null
+
+  if (transformedMembers.length === 0) {
+    return (
+      <div className="section">
+        <h2>🏢 オフィス出勤表</h2>
+        <p style={{ textAlign: 'center', padding: '40px', color: '#667085' }}>
+          メンバーが登録されていません。先にメンバー管理からメンバーを追加してください。
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="section">
-      <h2>🏢 オフィス出勤表{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
-
-      <div className="filter-section">
-        <h3>📊 オフィス出勤管理</h3>
-        <div className="filter-bar">
-          <div className="form-group">
-            <label>月を選択</label>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
-          </div>
-          <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
-        </div>
-        <p className="info-text">クリックして時間帯を選択してください（10時/12時/14時/16時/18時/20時）</p>
-      </div>
-
-      {/* カレンダービュー */}
-      <div className="office-calendar" style={{ marginTop: '20px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}>メンバー</th>
-              {calendarDates.map((cell, idx) => {
-                if (cell.isEmpty) return <th key={`empty-${idx}`} style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}></th>
-                const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
-                return (
-                  <th key={cell.date} style={{
-                    border: '1px solid #ddd',
-                    padding: '8px',
-                    backgroundColor: '#f5f5f5',
-                    color: dayClass === 'sunday' ? '#e74c3c' : dayClass === 'saturday' ? '#3498db' : '#333',
-                    fontSize: '0.9em'
-                  }}>
-                    <div>{cell.day}</div>
-                    <div style={{ fontSize: '0.8em' }}>
-                      {['日', '月', '火', '水', '木', '金', '土'][cell.dayOfWeek]}
-                    </div>
-                  </th>
-                )
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {displayMembers.map((member: any) => (
-              <tr key={member.id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
-                  {member.name}
-                </td>
-                {calendarDates.map((cell, idx) => {
-                  if (cell.isEmpty) return <td key={`empty-${idx}`} style={{ border: '1px solid #ddd', backgroundColor: '#f9f9f9' }}></td>
-
-                  const officeShift = shifts.find(
-                    (s: any) => s.date === cell.date && s.member_id === member.id && s.location_id === -1
-                  )
-
-                  const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
-
-                  return (
-                    <td
-                      key={cell.date}
-                      style={{
-                        border: '1px solid #ddd',
-                        padding: '4px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        backgroundColor: officeShift ? '#d4edda' : dayClass === 'sunday' ? '#ffebee' : dayClass === 'saturday' ? '#e3f2fd' : 'white',
-                        position: 'relative'
-                      }}
-                      onClick={() => openOfficeShiftModal(cell.date, member.id, member.name)}
-                      title={officeShift ? `オフィス出勤: ${officeShift.start_time}` : 'クリックして追加'}
-                    >
-                      {officeShift && (
-                        <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#155724' }}>
-                          🏢 {officeShift.start_time}
-                        </div>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* オフィス出勤編集モーダル */}
-      {editingOfficeShift && (
-        <div className="modal-overlay" onClick={cancelOfficeShiftModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>🏢 オフィス出勤 - 時間帯選択</h3>
-            <div className="modal-guide">
-              <p><strong>メンバー:</strong> {editingOfficeShift.member_name}</p>
-              <p><strong>日付:</strong> {editingOfficeShift.date}</p>
-            </div>
-
-            <div className="time-edit-form">
-              <div className="form-group">
-                <label>出勤時間帯 <span className="required">*必須</span></label>
-                <select
-                  value={selectedTimeSlot}
-                  onChange={(e) => setSelectedTimeSlot(e.target.value)}
-                  style={{ width: '100%', padding: '8px', fontSize: '1em' }}
-                >
-                  <option value="">選択してください</option>
-                  {timeSlots.map(slot => (
-                    <option key={slot.value} value={slot.value}>{slot.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>備考</label>
-                <textarea
-                  value={editingOfficeShift.notes || ''}
-                  onChange={(e) => setEditingOfficeShift({ ...editingOfficeShift, notes: e.target.value })}
-                  placeholder="例: 午前のみ、会議あり"
-                  rows={3}
-                  style={{ width: '100%', padding: '8px' }}
-                />
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button onClick={saveOfficeShift} className="submit-btn">保存</button>
-              {editingOfficeShift.id !== null && (
-                <button onClick={deleteOfficeShift} className="delete-btn" style={{ backgroundColor: '#dc3545' }}>削除</button>
-              )}
-              <button onClick={cancelOfficeShiftModal} className="cancel-btn">キャンセル</button>
-            </div>
-          </div>
+      {selectedMemberId && currentMemberName && (
+        <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '8px', borderLeft: '4px solid #1e63ff' }}>
+          <strong>👤 {currentMemberName}さん</strong>の個人ページ
         </div>
       )}
+      <AttendanceTable
+        members={transformedMembers}
+        records={attendanceRecords}
+        weekDates={weekDates}
+        onEditAttendance={handleEditAttendance}
+      />
+
+      {/* 出勤編集モーダル */}
+      <AttendanceEditModal
+        isOpen={isEditModalOpen}
+        memberName={editingMember?.name || ''}
+        date={editingDate || ''}
+        initialResidenceStartTime={editingRecord?.start_time}
+        initialResidenceClient={editingRecord?.location_name}
+        initialMeetings={editingRecord?.meetings || []}
+        initialMemo={editingRecord?.notes}
+        onSave={handleSaveAttendance}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEditingMemberId(null)
+          setEditingDate(null)
+        }}
+      />
     </div>
   )
 }
@@ -3780,6 +3733,19 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
   const [currentEntry, setCurrentEntry] = useState<any>(null)
   const [selectedMonth, setSelectedMonth] = useState('')
   const [todayEntry, setTodayEntry] = useState<any>(null)
+  const [editingRecord, setEditingRecord] = useState<any>(null)
+  const [editClockIn, setEditClockIn] = useState('')
+  const [editClockOut, setEditClockOut] = useState('')
+
+  // 現在のユーザーが管理者かチェック
+  const isAdmin = () => {
+    const sessionStr = localStorage.getItem('authSession')
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr)
+      return session.userRole === 'admin'
+    }
+    return false
+  }
 
   useEffect(() => {
     loadAttendance()
@@ -3906,7 +3872,7 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
     let clockOutDate = new Date(`${baseDate} ${clockOutTime}`)
 
     // 退勤時間が出勤時間より前の場合、翌日と判定
-    if (clockOutDate <= clockInDate) {
+    if (clockOutDate < clockInDate) {
       clockOutDate = new Date(clockOutDate.getTime() + 24 * 60 * 60 * 1000)
     }
 
@@ -3930,6 +3896,55 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
     if (!confirm('この勤怠記録を削除しますか？')) return
     const updated = attendance.filter(a => a.id !== id)
     saveAttendance(updated)
+  }
+
+  const startEditRecord = (record: any) => {
+    setEditingRecord(record)
+    setEditClockIn(record.clock_in || '')
+    setEditClockOut(record.clock_out || '')
+  }
+
+  const saveEditRecord = () => {
+    if (!editingRecord) return
+
+    if (!editClockIn) {
+      alert('出勤時刻を入力してください')
+      return
+    }
+
+    // 退勤時刻が入力されている場合、勤務時間を再計算
+    let updatedRecord = {
+      ...editingRecord,
+      clock_in: editClockIn,
+      clock_out: editClockOut || null
+    }
+
+    if (editClockOut) {
+      const baseDate = editingRecord.date
+      const clockInDate = new Date(`${baseDate} ${editClockIn}`)
+      let clockOutDate = new Date(`${baseDate} ${editClockOut}`)
+
+      if (clockOutDate < clockInDate) {
+        clockOutDate = new Date(clockOutDate.getTime() + 24 * 60 * 60 * 1000)
+      }
+
+      const totalHours = Math.max(0, (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60))
+      updatedRecord.total_hours = parseFloat(totalHours.toFixed(2))
+    } else {
+      updatedRecord.total_hours = null
+    }
+
+    const updated = attendance.map(a => a.id === editingRecord.id ? updatedRecord : a)
+    saveAttendance(updated)
+    setEditingRecord(null)
+    setEditClockIn('')
+    setEditClockOut('')
+  }
+
+  const cancelEdit = () => {
+    setEditingRecord(null)
+    setEditClockIn('')
+    setEditClockOut('')
   }
 
   const exportCSV = () => {
@@ -4069,25 +4084,88 @@ function AttendanceManagement({ selectedMemberId, currentMemberName }: { selecte
             </tr>
           </thead>
           <tbody>
-            {filteredAttendance.map((record) => (
-              <tr key={record.id}>
-                <td><strong>{record.member_name}</strong></td>
-                <td>{record.location_name}</td>
-                <td>{record.date}</td>
-                <td>{record.clock_in}</td>
-                <td>{record.clock_out || <span className="pending">勤務中</span>}</td>
-                <td>{record.total_hours ? `${record.total_hours.toFixed(2)}時間` : '-'}</td>
-                <td>
-                  <button className="delete-btn" onClick={() => deleteAttendance(record.id)}>削除</button>
-                </td>
-              </tr>
-            ))}
+            {filteredAttendance.map((record) => {
+              // 勤務時間を動的に再計算
+              let displayHours = '-'
+              if (record.clock_in && record.clock_out) {
+                const baseDate = record.date
+                const clockInDate = new Date(`${baseDate} ${record.clock_in}`)
+                let clockOutDate = new Date(`${baseDate} ${record.clock_out}`)
+
+                // 退勤時間が出勤時間より前の場合のみ、翌日と判定
+                if (clockOutDate < clockInDate) {
+                  clockOutDate = new Date(clockOutDate.getTime() + 24 * 60 * 60 * 1000)
+                }
+
+                const totalHours = Math.max(0, (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60))
+                displayHours = `${totalHours.toFixed(2)}時間`
+              }
+
+              return (
+                <tr key={record.id}>
+                  <td><strong>{record.member_name}</strong></td>
+                  <td>{record.location_name}</td>
+                  <td>{record.date}</td>
+                  <td>{record.clock_in}</td>
+                  <td>{record.clock_out || <span className="pending">勤務中</span>}</td>
+                  <td>{displayHours}</td>
+                  <td>
+                    {isAdmin() && (
+                      <button className="edit-btn" onClick={() => startEditRecord(record)} style={{ marginRight: '5px' }}>編集</button>
+                    )}
+                    <button className="delete-btn" onClick={() => deleteAttendance(record.id)}>削除</button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         {filteredAttendance.length === 0 && (
           <p className="no-data">勤怠記録がありません</p>
         )}
       </div>
+
+      {/* 編集モーダル */}
+      {editingRecord && (
+        <div className="modal-overlay" onClick={cancelEdit}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>勤怠時間を編集</h3>
+            <div className="form-group">
+              <label>メンバー</label>
+              <input type="text" value={editingRecord.member_name} disabled />
+            </div>
+            <div className="form-group">
+              <label>勤務地</label>
+              <input type="text" value={editingRecord.location_name} disabled />
+            </div>
+            <div className="form-group">
+              <label>日付</label>
+              <input type="text" value={editingRecord.date} disabled />
+            </div>
+            <div className="form-group">
+              <label>出勤時刻 *</label>
+              <input
+                type="time"
+                value={editClockIn}
+                onChange={(e) => setEditClockIn(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>退勤時刻</label>
+              <input
+                type="time"
+                value={editClockOut}
+                onChange={(e) => setEditClockOut(e.target.value)}
+              />
+            </div>
+            <div className="modal-buttons">
+              <button onClick={saveEditRecord} className="save-btn">保存</button>
+              <button onClick={cancelEdit} className="cancel-btn">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
