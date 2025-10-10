@@ -1,0 +1,41 @@
+[build]
+  # フロントエンドのビルドコマンド
+  command = "npm run build"
+  # ビルド出力ディレクトリ
+  publish = "frontend/dist"
+  # Netlify Functionsのディレクトリ
+  functions = "netlify/functions"
+
+[build.environment]
+  # Node.jsバージョン
+  NODE_VERSION = "18"
+
+# SPAのルーティング設定（すべてのルートをindex.htmlにリダイレクト）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  # APIリクエストは除外
+  conditions = {Role = ["admin", "user"], Cookie = ["*"]}
+  force = false
+
+# APIエンドポイントをNetlify Functionsにリダイレクト
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# CORSヘッダーの設定
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

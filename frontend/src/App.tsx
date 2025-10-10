@@ -193,7 +193,8 @@ function App() {
     const updatedMembers = members.map(m =>
       m.id === member.id ? { ...m, last_login: session.timestamp } : m
     )
-    saveMembers(updatedMembers)
+    safeLocalStorageSet(STORAGE_KEYS.MEMBERS, JSON.stringify(updatedMembers))
+    setMembers(updatedMembers)
 
     // セッション保存
     safeLocalStorageSet(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(session))
@@ -243,6 +244,11 @@ function App() {
   // ログイン済みユーザー情報
   const currentMember = authSession && authSession.userId > 0
     ? members.find(m => m.id === authSession.userId)
+    : null
+
+  // ログインユーザーがメンバーの場合、そのIDを使用（管理者の場合はnull）
+  const selectedMemberId = authSession && authSession.userId > 0 && authSession.userRole === 'member'
+    ? authSession.userId
     : null
 
   return (
