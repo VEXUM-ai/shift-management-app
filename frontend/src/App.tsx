@@ -3877,15 +3877,15 @@ function OfficeAttendanceView({ selectedMemberId, currentMemberName }: { selecte
 function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMemberId: number | null, currentMemberName?: string }) {
   const [clientMeetings, setClientMeetings] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
-  const [clientGroups, setClientGroups] = useState<string[]>([])
+  const [locations, setLocations] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [editingMeeting, setEditingMeeting] = useState<any>(null)
-  const [newClientGroup, setNewClientGroup] = useState('')
+  const [selectedClient, setSelectedClient] = useState('')
 
   useEffect(() => {
     loadClientMeetings()
     loadMembers()
-    loadClientGroups()
+    loadLocations()
   }, [])
 
   useEffect(() => {
@@ -3922,16 +3922,16 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
     }
   }
 
-  const loadClientGroups = () => {
+  const loadLocations = () => {
     try {
-      const stored = localStorage.getItem('shift_app_client_groups')
+      const stored = localStorage.getItem(STORAGE_KEYS.LOCATIONS)
       if (stored) {
         const parsed = JSON.parse(stored)
-        setClientGroups(Array.isArray(parsed) ? parsed : [])
+        setLocations(Array.isArray(parsed) ? parsed : [])
       }
     } catch (error) {
-      console.error('Error loading client groups:', error)
-      setClientGroups([])
+      console.error('Error loading locations:', error)
+      setLocations([])
     }
   }
 
@@ -3941,63 +3941,96 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
     }
   }
 
-  const saveClientGroups = (groups: string[]) => {
-    if (safeLocalStorageSet('shift_app_client_groups', JSON.stringify(groups))) {
-      setClientGroups(groups)
-    }
-  }
+  // クライアント企業（type='client'のlocation）を取得
+  const clientLocations = locations.filter((loc: any) => loc.type === 'client')
 
-  const addClientGroup = () => {
-    if (!newClientGroup.trim()) {
-      alert('クライアントグループ名を入力してください')
-      return
-    }
+  // 月間時間を計算
+  const calculateMonthlyHours = (clientLocationId: number) => {
+    if (!selectedMonth) return 0
 
-    if (clientGroups.includes(newClientGroup.trim())) {
-      alert('このクライアントグループは既に存在します')
-      return
-    }
-
-    const updated = [...clientGroups, newClientGroup.trim()]
-    saveClientGroups(updated)
-    setNewClientGroup('')
-  }
-
-  const deleteClientGroup = (groupName: string) => {
-    if (!confirm(`「${groupName}」を削除しますか？このグループに関連する会議は削除されません。`)) return
-
-    const updated = clientGroups.filter(g => g !== groupName)
-    saveClientGroups(updated)
-  }
-
-  const openMeetingModal = (date: string, memberId: number, memberName: string, clientGroup?: string) => {
-    const existingMeeting = clientMeetings.find(
-      m => m.date === date && m.member_id === memberId && m.client_group === clientGroup
+    const meetings = clientMeetings.filter(m =>
+      m.client_location_id === clientLocationId &&
+      m.date.startsWith(selectedMonth)
     )
 
+    let totalHours = 0
+    meetings.forEach(m => {
+      const [startHours, startMinutes] = m.start_time.split(':').map(Number)
+      const [endHours, endMinutes] = m.end_time.split(':').map(Number)
+      const hours = (endHours * 60 + endMinutes - (startHours * 60 + startMinutes)) / 60
+      totalHours += hours
+    })
+
+    return totalHours
+  }
+
+  const openMeetingModal = (date: string, memberId?: number, memberName?: string) => {
     setEditingMeeting({
-      id: existingMeeting?.id || null,
-      member_id: memberId,
-      member_name: memberName,
+      id: null,
+      member_id: memberId || null,
+      member_name: memberName || '',
       date: date,
-      client_group: clientGroup || '',
-      start_time: existingMeeting?.start_time || '',
-      end_time: existingMeeting?.end_time || '',
-      purpose: existingMeeting?.purpose || '',
-      notes: existingMeeting?.notes || ''
+      client_location_id: null,
+      client_location_name: '',
+      start_time: '',
+      end_time: '',
+      purpose: '',
+      participants: [],
+      has_office_attendance: false,
+      notes: ''
+    })
+  }
+
+  const openEditMeetingModal = (meeting: any) => {
+    setEditingMeeting({
+      id: meeting.id,
+      member_id: meeting.member_id,
+      member_name: meeting.member_name,
+      date: meeting.date,
+      client_location_id: meeting.client_location_id,
+      client_location_name: meeting.client_location_name,
+      start_time: meeting.start_time,
+      end_time: meeting.end_time,
+      purpose: meeting.purpose || '',
+      participants: meeting.participants || [],
+      has_office_attendance: meeting.has_office_attendance || false,
+      notes: meeting.notes || ''
     })
   }
 
   const saveMeeting = () => {
     if (!editingMeeting) return
-    if (!editingMeeting.client_group) {
-      alert('クライアントグループを選択してください')
+    if (!editingMeeting.client_location_id) {
+      alert('クライアント企業を選択してください')
       return
     }
     if (!editingMeeting.start_time || !editingMeeting.end_time) {
       alert('開始時刻と終了時刻を入力してください')
       return
     }
+
+    // 時間を計算
+    const [startHours, startMinutes] = editingMeeting.start_time.split(':').map(Number)
+    const [endHours, endMinutes] = editingMeeting.end_time.split(':').map(Number)
+    const meetingHours = (endHours * 60 + endMinutes - (startHours * 60 + startMinutes)) / 60
+
+    // 40時間上限チェック
+    const currentMonthlyHours = calculateMonthlyHours(editingMeeting.client_location_id)
+    const newTotal = currentMonthlyHours + meetingHours
+
+    if (newTotal > 40) {
+      alert(`⚠️ この会議を追加すると月間合計が${newTotal.toFixed(2)}時間になり、上限の40時間を超えます。`)
+      return
+    }
+
+    // 30時間警告
+    if (currentMonthlyHours < 30 && newTotal >= 30) {
+      if (!confirm(`⚠️ この会議を追加すると月間合計が${newTotal.toFixed(2)}時間になります。\n30時間に達しました。続けますか？`)) {
+        return
+      }
+    }
+
+    const selectedLocation = locations.find((l: any) => l.id === editingMeeting.client_location_id)
 
     let updated: any[]
     if (editingMeeting.id === null) {
@@ -4006,10 +4039,13 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
         member_id: editingMeeting.member_id,
         member_name: editingMeeting.member_name,
         date: editingMeeting.date,
-        client_group: editingMeeting.client_group,
+        client_location_id: editingMeeting.client_location_id,
+        client_location_name: selectedLocation?.name || '',
         start_time: editingMeeting.start_time,
         end_time: editingMeeting.end_time,
         purpose: editingMeeting.purpose || null,
+        participants: editingMeeting.participants || [],
+        has_office_attendance: editingMeeting.has_office_attendance || false,
         notes: editingMeeting.notes || null,
         created_at: new Date().toISOString()
       }
@@ -4019,10 +4055,13 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
         m.id === editingMeeting.id
           ? {
               ...m,
-              client_group: editingMeeting.client_group,
+              client_location_id: editingMeeting.client_location_id,
+              client_location_name: selectedLocation?.name || '',
               start_time: editingMeeting.start_time,
               end_time: editingMeeting.end_time,
               purpose: editingMeeting.purpose || null,
+              participants: editingMeeting.participants || [],
+              has_office_attendance: editingMeeting.has_office_attendance || false,
               notes: editingMeeting.notes || null,
               updated_at: new Date().toISOString()
             }
@@ -4083,23 +4122,36 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
     : filteredMeetings
 
   const exportCSV = () => {
-    if (displayMeetings.length === 0) {
+    const filtered = displayMeetings.filter(m => !selectedClient || String(m.client_location_id) === selectedClient)
+
+    if (filtered.length === 0) {
       alert('エクスポートするデータがありません')
       return
     }
 
-    const header = ['日付', 'メンバー', 'クライアントグループ', '開始時刻', '終了時刻', '目的', '備考']
-    const rows = displayMeetings
+    const header = ['日付', 'クライアント企業', '開始時刻', '終了時刻', '時間', '目的', '参加者', 'オフィス出社', '備考']
+    const rows = filtered
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map(m => [
-        m.date,
-        m.member_name,
-        m.client_group,
-        m.start_time || '',
-        m.end_time || '',
-        m.purpose || '',
-        m.notes || ''
-      ])
+      .map(m => {
+        const [startH, startM] = m.start_time.split(':').map(Number)
+        const [endH, endM] = m.end_time.split(':').map(Number)
+        const hours = ((endH * 60 + endM - (startH * 60 + startM)) / 60).toFixed(1)
+        const participantNames = (m.participants || [])
+          .map((id: number) => members.find((mem: any) => mem.id === id)?.name || '不明')
+          .join('、')
+
+        return [
+          m.date,
+          m.client_location_name,
+          m.start_time || '',
+          m.end_time || '',
+          `${hours}h`,
+          m.purpose || '',
+          participantNames || '-',
+          m.has_office_attendance ? 'あり' : 'なし',
+          m.notes || ''
+        ]
+      })
 
     const csv = [header, ...rows].map(row => row.join(',')).join('\n')
     const bom = '\uFEFF'
@@ -4119,53 +4171,52 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
     <div className="section">
       <h2>📅 クライアント会議{selectedMemberId && currentMemberName ? ` - ${currentMemberName}さんの個人ページ` : ''}</h2>
 
-      {/* クライアントグループ管理 */}
+      {/* クライアント企業ごとの月間時間管理 */}
       <div className="filter-section" style={{ marginBottom: '20px' }}>
-        <h3>👥 クライアントグループ管理</h3>
-        <div className="form-group" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label>新しいグループを追加</label>
-            <input
-              type="text"
-              value={newClientGroup}
-              onChange={(e) => setNewClientGroup(e.target.value)}
-              placeholder="例: A社、B社グループ"
-              onKeyPress={(e) => e.key === 'Enter' && addClientGroup()}
-            />
+        <h3>🏢 クライアント企業別　月間会議時間</h3>
+        {selectedMonth && clientLocations.length > 0 ? (
+          <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+            {clientLocations.map((location: any) => {
+              const monthlyHours = calculateMonthlyHours(location.id)
+              const percentage = (monthlyHours / 40) * 100
+              const isWarning = monthlyHours >= 30
+              const isDanger = monthlyHours >= 40
+
+              return (
+                <div key={location.id} style={{
+                  padding: '16px',
+                  backgroundColor: isDanger ? '#fee2e2' : isWarning ? '#fef3c7' : '#f0f9ff',
+                  borderRadius: '8px',
+                  border: `2px solid ${isDanger ? '#ef4444' : isWarning ? '#f59e0b' : '#3b82f6'}`
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div>
+                      <strong style={{ fontSize: '16px' }}>{location.name}</strong>
+                      {isDanger && <span style={{ marginLeft: '8px', color: '#ef4444', fontSize: '14px' }}>⚠️ 上限達成</span>}
+                      {isWarning && !isDanger && <span style={{ marginLeft: '8px', color: '#f59e0b', fontSize: '14px' }}>⚠️ 30時間警告</span>}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: isDanger ? '#ef4444' : isWarning ? '#f59e0b' : '#3b82f6' }}>
+                      {monthlyHours.toFixed(1)}h / 40h
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(percentage, 100)}%`,
+                      height: '100%',
+                      backgroundColor: isDanger ? '#ef4444' : isWarning ? '#f59e0b' : '#3b82f6',
+                      transition: 'width 0.3s'
+                    }}></div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          <button onClick={addClientGroup} className="submit-btn">追加</button>
-        </div>
-        <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {clientGroups.map(group => (
-            <div key={group} style={{
-              padding: '6px 12px',
-              backgroundColor: '#e0e7ff',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>{group}</span>
-              <button
-                onClick={() => deleteClientGroup(group)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#ef4444',
-                  fontSize: '1.2em',
-                  padding: '0',
-                  lineHeight: 1
-                }}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
+        ) : (
+          <p style={{ color: '#6b7280', marginTop: '12px' }}>クライアント企業が登録されていません。クライアント先管理から追加してください。</p>
+        )}
       </div>
 
-      {/* カレンダー */}
+      {/* 会議一覧・追加 */}
       <div className="filter-section">
         <h3>📊 会議スケジュール</h3>
         <div className="filter-bar">
@@ -4177,122 +4228,153 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
               onChange={(e) => setSelectedMonth(e.target.value)}
             />
           </div>
+          <div className="form-group">
+            <label>クライアント企業</label>
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              style={{ padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+            >
+              <option value="">すべて</option>
+              {clientLocations.map((loc: any) => (
+                <option key={loc.id} value={String(loc.id)}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => openMeetingModal(new Date().toISOString().split('T')[0])} className="submit-btn">➕ 新規会議追加</button>
           <button onClick={exportCSV} className="export-btn">📥 CSV出力</button>
         </div>
-        <p className="info-text">クリックして会議を追加・編集してください</p>
       </div>
 
-      <div className="office-calendar" style={{ marginTop: '20px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}>メンバー</th>
-              {calendarDates.map((cell, idx) => {
-                if (cell.isEmpty) return <th key={`empty-${idx}`} style={{ border: '1px solid #ddd', padding: '8px', backgroundColor: '#f5f5f5' }}></th>
-                const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
+      {/* 会議リスト表示 */}
+      <div style={{ marginTop: '20px' }}>
+        <h3>📋 会議一覧</h3>
+        {displayMeetings.filter(m => !selectedClient || String(m.client_location_id) === selectedClient).length === 0 ? (
+          <p style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            会議が登録されていません。上の「➕ 新規会議追加」ボタンから追加してください。
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {displayMeetings
+              .filter(m => !selectedClient || String(m.client_location_id) === selectedClient)
+              .sort((a, b) => b.date.localeCompare(a.date) || b.start_time.localeCompare(a.start_time))
+              .map((meeting: any) => {
+                const [startH, startM] = meeting.start_time.split(':').map(Number)
+                const [endH, endM] = meeting.end_time.split(':').map(Number)
+                const hours = (endH * 60 + endM - (startH * 60 + startM)) / 60
+
                 return (
-                  <th key={cell.date} style={{
-                    border: '1px solid #ddd',
-                    padding: '8px',
-                    backgroundColor: '#f5f5f5',
-                    color: dayClass === 'sunday' ? '#e74c3c' : dayClass === 'saturday' ? '#3498db' : '#333',
-                    fontSize: '0.9em'
-                  }}>
-                    <div>{cell.day}</div>
-                    <div style={{ fontSize: '0.8em' }}>
-                      {['日', '月', '火', '水', '木', '金', '土'][cell.dayOfWeek]}
+                  <div key={meeting.id} style={{
+                    padding: '16px',
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => openEditMeetingModal(meeting)}
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', color: '#3b82f6', fontWeight: 'bold', marginBottom: '4px' }}>
+                          🏢 {meeting.client_location_name}
+                        </div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
+                          {meeting.purpose || '（目的未設定）'}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                          📅 {meeting.date} {meeting.start_time} - {meeting.end_time} ({hours.toFixed(1)}h)
+                        </div>
+                        {meeting.member_name && (
+                          <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+                            👤 {meeting.member_name}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                        {meeting.has_office_attendance && (
+                          <span style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '12px', fontWeight: 'bold' }}>
+                            🏢 オフィス出社
+                          </span>
+                        )}
+                        {meeting.participants && meeting.participants.length > 0 && (
+                          <span style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontWeight: 'bold' }}>
+                            👥 {meeting.participants.length}名参加
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </th>
+                    {meeting.participants && meeting.participants.length > 0 && (
+                      <div style={{ fontSize: '13px', color: '#374151', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        <strong>参加者:</strong> {meeting.participants.map((p: any) => members.find((m: any) => m.id === p)?.name || '不明').join(', ')}
+                      </div>
+                    )}
+                    {meeting.notes && (
+                      <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        📝 {meeting.notes}
+                      </div>
+                    )}
+                  </div>
                 )
               })}
-            </tr>
-          </thead>
-          <tbody>
-            {displayMembers.map((member: any) => (
-              <tr key={member.id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
-                  {member.name}
-                </td>
-                {calendarDates.map((cell, idx) => {
-                  if (cell.isEmpty) return <td key={`empty-${idx}`} style={{ border: '1px solid #ddd', backgroundColor: '#f9f9f9' }}></td>
-
-                  const dayMeetings = clientMeetings.filter(
-                    (m: any) => m.date === cell.date && m.member_id === member.id
-                  )
-
-                  const dayClass = cell.dayOfWeek === 0 ? 'sunday' : cell.dayOfWeek === 6 ? 'saturday' : ''
-
-                  return (
-                    <td
-                      key={cell.date}
-                      style={{
-                        border: '1px solid #ddd',
-                        padding: '4px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        backgroundColor: dayMeetings.length > 0 ? '#dbeafe' : dayClass === 'sunday' ? '#ffebee' : dayClass === 'saturday' ? '#e3f2fd' : 'white',
-                        position: 'relative'
-                      }}
-                      onClick={() => openMeetingModal(cell.date, member.id, member.name)}
-                      title={dayMeetings.length > 0 ? `会議 ${dayMeetings.length}件` : 'クリックして追加'}
-                    >
-                      {dayMeetings.length > 0 && (
-                        <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: '#1e40af' }}>
-                          📅 {dayMeetings.length}件
-                        </div>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
 
       {/* 会議編集モーダル */}
       {editingMeeting && (
         <div className="modal-overlay" onClick={cancelMeetingModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>📅 クライアント会議</h3>
-            <div className="modal-guide">
-              <p><strong>メンバー:</strong> {editingMeeting.member_name}</p>
-              <p><strong>日付:</strong> {editingMeeting.date}</p>
-            </div>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>📅 クライアント会議 {editingMeeting.id ? '編集' : '追加'}</h3>
 
             <div className="time-edit-form">
               <div className="form-group">
-                <label>クライアントグループ <span className="required">*必須</span></label>
+                <label>日付 <span className="required">*必須</span></label>
+                <input
+                  type="date"
+                  value={editingMeeting.date}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, date: e.target.value })}
+                  style={{ width: '100%', padding: '8px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>クライアント企業 <span className="required">*必須</span></label>
                 <select
-                  value={editingMeeting.client_group}
-                  onChange={(e) => setEditingMeeting({ ...editingMeeting, client_group: e.target.value })}
+                  value={editingMeeting.client_location_id || ''}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, client_location_id: parseInt(e.target.value) })}
                   style={{ width: '100%', padding: '8px', fontSize: '1em' }}
                 >
                   <option value="">選択してください</option>
-                  {clientGroups.map(group => (
-                    <option key={group} value={group}>{group}</option>
+                  {clientLocations.map((loc: any) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>開始時刻 <span className="required">*必須</span></label>
-                <input
-                  type="time"
-                  value={editingMeeting.start_time}
-                  onChange={(e) => setEditingMeeting({ ...editingMeeting, start_time: e.target.value })}
-                  style={{ width: '100%', padding: '8px' }}
-                />
-              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label>開始時刻 <span className="required">*必須</span></label>
+                  <input
+                    type="time"
+                    value={editingMeeting.start_time}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, start_time: e.target.value })}
+                    style={{ width: '100%', padding: '8px' }}
+                  />
+                </div>
 
-              <div className="form-group">
-                <label>終了時刻 <span className="required">*必須</span></label>
-                <input
-                  type="time"
-                  value={editingMeeting.end_time}
-                  onChange={(e) => setEditingMeeting({ ...editingMeeting, end_time: e.target.value })}
-                  style={{ width: '100%', padding: '8px' }}
-                />
+                <div className="form-group">
+                  <label>終了時刻 <span className="required">*必須</span></label>
+                  <input
+                    type="time"
+                    value={editingMeeting.end_time}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, end_time: e.target.value })}
+                    style={{ width: '100%', padding: '8px' }}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -4304,6 +4386,43 @@ function ClientMeetingView({ selectedMemberId, currentMemberName }: { selectedMe
                   placeholder="例: 月次報告会、打ち合わせ"
                   style={{ width: '100%', padding: '8px' }}
                 />
+              </div>
+
+              <div className="form-group">
+                <label>参加者（複数選択可）</label>
+                <div style={{ border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+                  {members.map((m: any) => (
+                    <label key={m.id} style={{ display: 'flex', alignItems: 'center', padding: '6px', cursor: 'pointer', borderRadius: '4px' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={editingMeeting.participants?.includes(m.id) || false}
+                        onChange={(e) => {
+                          const newParticipants = e.target.checked
+                            ? [...(editingMeeting.participants || []), m.id]
+                            : (editingMeeting.participants || []).filter((id: number) => id !== m.id)
+                          setEditingMeeting({ ...editingMeeting, participants: newParticipants })
+                        }}
+                        style={{ marginRight: '8px' }}
+                      />
+                      <span>{m.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={editingMeeting.has_office_attendance || false}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, has_office_attendance: e.target.checked })}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <span>🏢 この会議でオフィスに出社する</span>
+                </label>
               </div>
 
               <div className="form-group">
